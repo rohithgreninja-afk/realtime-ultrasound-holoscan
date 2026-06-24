@@ -10,7 +10,7 @@ A complete end-to-end pipeline for real-time breast ultrasound classification: r
 ## Pipeline Architecture
 
 ```
-OASBUD RF data
+OASBUD RF data [1]
      |
      v
 DataSourceOp        -- loads .mat file, emits frames one at a time
@@ -30,9 +30,26 @@ OutputOp            -- record prediction, print summary, save results
 
 ---
 
+## Image Enhancement
+
+Four candidate speckle-reduction filters from the Image Processing Toolbox were compared on reconstructed B-mode images, scored by PSNR and structural similarity (SSIM):
+
+| Filter | PSNR | SSIM | Notes |
+|---|---|---|---|
+| **Median 3x3 (selected)** | **24.77 dB** | **0.4011** | Best SSIM, used throughout the pipeline |
+| Wiener 5x5 | -- | -- | Evaluated, did not outperform median |
+| Adaptive histogram equalisation | -- | -- | Excluded: amplifies arc-shaped artefacts in log-compressed images |
+| Bilateral filter | -- | -- | Over-smoothed; SSIM 0.3329 |
+
+The 3x3 median filter was selected and is the `EnhancementOp` stage in the deployed pipeline.
+
+![Enhancement Filter Comparison](Project%20Figures/Phase3/Phase3_Final_Summary.png)
+
+---
+
 ## Simulink Representation
 
-The same five-stage pipeline (DataSource -> Beamforming -> Enhancement -> Inference -> Output) is also expressed as a Simulink block diagram, `Simulink/UltrasoundPipelineDiagram.slx`. This is an architectural diagram only, not a functional simulation, it maps the deployed pipeline onto Simulink's block-diagram paradigm. The actual real-time execution path remains the Holoscan pipeline described above.
+The same five-stage pipeline (DataSource -> Beamforming -> Enhancement -> Inference -> Output) is also expressed as a Simulink block diagram, `Simulink/UltrasoundPipelineDiagram.slx`. This is an illustrative architecture diagram only: it contains plain labelled blocks with no underlying `matlab.System` classes, no executable logic, and no simulation behaviour of any kind, it exists purely to visualise the pipeline structure. The actual real-time execution path remains the Holoscan pipeline described above.
 
 ![Simulink Pipeline Diagram](Project%20Figures/Simulink/Simulink_Pipeline_Diagram_Simple.png)
 
@@ -68,12 +85,14 @@ Throughput: **34.0 fps** (mean) | **16.0 fps** (p95) | Accuracy: **73.0%**
 
 | Dataset | Images | Source |
 |---|---|---|
-| BUSI | 780 | Standard benchmark, clinical scanner PNG |
-| BUS-UCLM | 646 | Spanish clinical scanner, Doppler filtered |
-| BUS-BRA | 1875 | Zenodo, largest available breast US dataset |
-| BrEaST | 256 | Cancer Imaging Archive, CC-BY 4.0 |
-| OASBUD-PNG | 880 | Reconstructed from OASBUD RF via A-line pipeline |
+| BUSI [2] | 780 | Standard benchmark, clinical scanner PNG |
+| BUS-UCLM [3] | 646 | Spanish clinical scanner, Doppler filtered |
+| BUS-BRA [4] | 1875 | Zenodo, largest available breast US dataset |
+| BrEaST [5] | 256 | Cancer Imaging Archive, CC-BY 4.0 |
+| OASBUD-PNG [1] | 880 | Reconstructed from OASBUD RF via A-line pipeline |
 | **Total** | **4437** | Train 3106 / Val 666 / Test 665 |
+
+Bracketed numbers reference the full dataset citations in [References](#references).
 
 ---
 
@@ -101,14 +120,13 @@ realtime-ultrasound-holoscan/
 │   └── Phase6_Pipeline_Benchmark.py Standalone timing benchmark
 │
 ├── Simulink/
-│   └── UltrasoundPipelineDiagram.slx  Five-stage architecture diagram (illustrative only)
+│   └── UltrasoundPipelineDiagram.slx  Five-stage architecture diagram (illustrative only, no executable logic)
 │
 ├── Project Figures/                Figures from Phases 3-6 and the Simulink diagram
 │
-├── Project_Documentation.docx     Phase-by-phase technical documentation
-├── MATLAB_Session_CodeLog.docx    Every code block with output and explanation
-├── Doubts_and_Questions_Log.docx  Q&A log covering all concepts
-└── Holoscan_Python_Reference.docx Holoscan pipeline reference
+├── Real-Time_Acceleration_Project_Report.docx  Complete project report (background, methodology, results, references)
+│
+└── README.md
 ```
 
 ---
@@ -152,7 +170,7 @@ Requirements: WSL2 Ubuntu 24.10, Python 3.10, Holoscan 4.2.0, ONNX Runtime GPU.
 - Output node `new_softmax` already contains probabilities. No manual softmax.
 - Class order: index 0 = benign, index 1 = malignant, index 2 = normal.
 
-**OASBUD dataset:**
+**OASBUD dataset [1]:**
 - RF depth varies per patient (1040-2864 rows). Never hardcode 1824.
 - `class` field: 0 = malignant, 1 = benign (counterintuitive).
 - In Python: `getattr(patient, 'class')` -- `class` is a reserved keyword.
@@ -163,8 +181,26 @@ Requirements: WSL2 Ubuntu 24.10, Python 3.10, Holoscan 4.2.0, ONNX Runtime GPU.
 
 ---
 
-## Acknowledgements
+## References
 
-Datasets: BUSI (Cairo University), BUS-UCLM (University of Castilla-La Mancha), BUS-BRA (Zenodo 8231412), BrEaST (Cancer Imaging Archive, CC-BY 4.0), OASBUD (Warsaw University of Technology).
+**Datasets**
 
-Built on: NVIDIA Holoscan SDK 4.2.0, MATLAB R2024b, MobileNetV2 (Howard et al. 2018), ONNX Runtime.
+[1] Piotrzkowska-Wroblewska, H., Dobruch-Sobczak, K., Byra, M., and Nowicki, A. Open access database of raw ultrasonic signals acquired from malignant and benign breast lesions (OASBUD). Zenodo. https://doi.org/10.5281/zenodo.545928
+
+[2] Al-Dhabyani, W., Gomaa, M., Khaled, H., and Fahmy, A. (2020). Dataset of Breast Ultrasound Images (BUSI). Data in Brief, 28, 104863.
+
+[3] BUS-UCLM: Breast Ultrasound Lesion Segmentation Dataset, University of Castilla-La Mancha.
+
+[4] BUS-BRA: A Breast Ultrasound Dataset for Assessing Computer-Aided Diagnosis Systems. Zenodo.
+
+[5] BrEaST: Breast Lesions Ultrasound Dataset. The Cancer Imaging Archive, CC-BY 4.0 licence.
+
+[6] Ultrasound Plane Wave Raw Data, 75 Angles, Breast Phantom and Calibration Phantom Dataset (CIRS040GSE). Zenodo, record 7986407.
+
+**Tools and models**
+
+[7] Howard, A., Zhmoginov, A., Chen, L.-C., Sandler, M., and Zhu, M. (2018). MobileNetV2: Inverted Residuals and Linear Bottlenecks.
+
+[8] MathWorks. MATLAB R2024b, including the Deep Learning Toolbox, Image Processing Toolbox, GPU Coder, and Phased Array System Toolbox.
+
+[9] NVIDIA Corporation. NVIDIA Holoscan SDK, version 4.2.0.
