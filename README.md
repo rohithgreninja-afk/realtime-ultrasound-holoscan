@@ -57,6 +57,9 @@ The same five-stage pipeline (DataSource -> Beamforming -> Enhancement -> Infere
 
 ## Results
 
+This section reports what was actually measured: classification performance on the
+held-out test set, and real-time throughput on the deployed pipeline.
+
 ### CNN Evaluation (665 test images)
 
 | Class | Precision | Recall | F1 |
@@ -64,7 +67,8 @@ The same five-stage pipeline (DataSource -> Beamforming -> Enhancement -> Infere
 | benign | 88.5% | 89.7% | 0.891 |
 | malignant | 86.9% | 80.8% | 0.838 |
 | normal | 83.9% | 94.0% | 0.886 |
-| **Overall** | | **87.37%** | |
+
+**Overall Test Accuracy: 87.37%**
 
 Malignant detection AUC-ROC: **0.9509** | AUC-PR: **0.8918**
 
@@ -75,7 +79,7 @@ Malignant detection AUC-ROC: **0.9509** | AUC-PR: **0.8918**
 | Beamforming | 23.50 | 80% |
 | Enhancement | 2.33 | 8% |
 | ONNX Inference | 3.49 | 12% |
-| **Total** | **29.37** | |
+| **Total** | **29.37** | **100%** |
 
 Throughput: **34.0 fps** (mean) | **16.0 fps** (p95) | Accuracy: **73.0%**
 
@@ -124,7 +128,7 @@ realtime-ultrasound-holoscan/
 │
 ├── Project Figures/                Figures from Phases 3-6 and the Simulink diagram
 │
-├── Real-Time_Acceleration_Project_Report.docx  Complete project report (background, methodology, results, references)
+├── Project_Documentation.docx      Complete project report (background, methodology, results, references)
 │
 └── README.md
 ```
