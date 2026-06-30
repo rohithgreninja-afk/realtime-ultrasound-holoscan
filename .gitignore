@@ -1,0 +1,28 @@
+# MATLAB codegen build artifacts
+MATLAB Codes/codegen/
+*.slxc
+slprj/
+
+# MATLAB autosave / temp
+*.asv
+*.m~
+
+# Python
+__pycache__/
+*.pyc
+venv/
+*.egg-info/
+
+# Pipeline run outputs (regenerated each run, not source)
+Holoscan/pipeline_results.npy
+Holoscan/results/
+
+# Word lock files
+~$*.doc*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Full datasets (only data/sample/ is committed)
+data/full/

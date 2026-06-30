@@ -4,6 +4,7 @@
 # and emits them one at a time into the Holoscan pipeline
 # =========================================================
 
+import os
 import holoscan
 import numpy as np
 import scipy.io
@@ -21,7 +22,16 @@ class DataSourceOp(holoscan.core.Operator):
 
     def start(self):
         # Runs once before first frame — load the dataset here
-        mat_path = "/mnt/c/Users/rohit/Downloads/Real Time Image Processing Project/OASBUD.mat"
+        _this_dir  = os.path.dirname(os.path.abspath(__file__))
+        _repo_root = os.path.dirname(_this_dir)
+        _default_sample = os.path.join(_repo_root, "data", "sample", "OASBUD_sample.mat")
+        mat_path = os.environ.get("OASBUD_PATH", _default_sample)
+        if not os.path.exists(mat_path):
+            raise FileNotFoundError(
+                f"OASBUD data not found at {mat_path}. Either ensure the bundled "
+                f"data/sample/OASBUD_sample.mat exists, or set the OASBUD_PATH "
+                f"environment variable to point at the full OASBUD.mat file."
+            )
         print(f"Loading OASBUD dataset from {mat_path}...")
         mat = scipy.io.loadmat(mat_path, simplify_cells=True)
         self.data    = mat['data']          # list of 100 patient dicts

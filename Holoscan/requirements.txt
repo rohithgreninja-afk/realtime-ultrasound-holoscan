@@ -1,0 +1,6 @@
+holoscan==4.2.0
+onnxruntime-gpu
+numpy
+scipy
+pillow
+matplotlib

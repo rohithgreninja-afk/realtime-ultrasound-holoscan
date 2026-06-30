@@ -20,9 +20,14 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # ---- Paths ----
-OASBUD_PATH = '/mnt/c/Users/rohit/Downloads/Real Time Image Processing Project/OASBUD.mat'
-ONNX_PATH   = '/mnt/c/Users/rohit/Documents/MATLAB Code/trainedMobileNetV2_mega.onnx'
-OUTPUT_DIR  = '/home/rohit/project/phase6_figures'
+_THIS_DIR  = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.dirname(_THIS_DIR)
+OASBUD_PATH = os.environ.get(
+    'OASBUD_PATH', os.path.join(_REPO_ROOT, 'data', 'sample', 'OASBUD_sample.mat'))
+ONNX_PATH   = os.environ.get(
+    'ONNX_MODEL_PATH', os.path.join(_REPO_ROOT, 'MATLAB Codes', 'trainedMobileNetV2_mega.onnx'))
+OUTPUT_DIR  = os.environ.get(
+    'RESULTS_DIR', os.path.join(_THIS_DIR, 'phase6_figures'))
 CLASS_NAMES = ['benign', 'malignant', 'normal']
 N_WARMUP    = 5
 

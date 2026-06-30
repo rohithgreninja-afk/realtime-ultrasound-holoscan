@@ -6,6 +6,7 @@
 # (normal probability is absorbed into benign by InferenceOp)
 # =========================================================
 
+import os
 import holoscan
 import numpy as np
 import time
@@ -107,5 +108,9 @@ class OutputOp(holoscan.core.Operator):
         print(f'  Total time          : {total_time:.2f} s')
         print('=' * 64)
 
-        np.save('/home/rohit/project/pipeline_results.npy', self.results)
-        print('Results saved to ~/project/pipeline_results.npy')
+        _this_dir   = os.path.dirname(os.path.abspath(__file__))
+        _results_dir = os.environ.get('RESULTS_DIR', _this_dir)
+        os.makedirs(_results_dir, exist_ok=True)
+        _results_path = os.path.join(_results_dir, 'pipeline_results.npy')
+        np.save(_results_path, self.results)
+        print(f'Results saved to {_results_path}')

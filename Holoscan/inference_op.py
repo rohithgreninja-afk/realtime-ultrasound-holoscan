@@ -12,6 +12,7 @@
 #   then decide malignant vs benign only.
 # =========================================================
 
+import os
 import holoscan
 import numpy as np
 import onnxruntime as ort
@@ -20,7 +21,12 @@ import onnxruntime as ort
 class InferenceOp(holoscan.core.Operator):
 
     CLASSES   = ['benign', 'malignant', 'normal']
-    ONNX_PATH = '/mnt/c/Users/rohit/Documents/MATLAB Code/trainedMobileNetV2_mega.onnx'
+    _THIS_DIR  = os.path.dirname(os.path.abspath(__file__))
+    _REPO_ROOT = os.path.dirname(_THIS_DIR)
+    ONNX_PATH  = os.environ.get(
+        'ONNX_MODEL_PATH',
+        os.path.join(_REPO_ROOT, 'MATLAB Codes', 'trainedMobileNetV2_mega.onnx')
+    )
 
     def setup(self, spec):
         spec.input('enhanced')

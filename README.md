@@ -115,21 +115,30 @@ realtime-ultrasound-holoscan/
 │   └── trainedMobileNetV2_mega.onnx ONNX export for Python inference
 │
 ├── Holoscan/
-│   ├── medical_imaging_pipeline.py Main Holoscan application
-│   ├── data_source_op.py           RF data loader
+│   ├── medical_imaging_pipeline.py Main Holoscan application -- entry point
+│   ├── data_source_op.py           RF data loader (defaults to bundled sample, override with OASBUD_PATH)
 │   ├── beamforming_op.py           A-line reconstruction
 │   ├── enhancement_op.py           Normalisation and resize
-│   ├── inference_op.py             ONNX inference operator
-│   ├── output_op.py                Result recording
-│   └── Phase6_Pipeline_Benchmark.py Standalone timing benchmark
+│   ├── inference_op.py             ONNX inference operator (model path override: ONNX_MODEL_PATH)
+│   ├── output_op.py                Result recording (output dir override: RESULTS_DIR)
+│   ├── Phase6_Pipeline_Benchmark.py Standalone timing benchmark
+│   └── requirements.txt            Python dependencies for the Holoscan pipeline
 │
 ├── Simulink/
 │   └── UltrasoundPipelineDiagram.slx  Five-stage architecture diagram (illustrative only, no executable logic)
+│
+├── data/
+│   └── sample/
+│       └── OASBUD_sample.mat       10-patient bundled sample (5 malignant, 5 benign) for one-click testing
+│                                   (kept small -- ~31 MB, ~3.1 MB/patient -- to stay well under GitHub's
+│                                   50 MB soft limit; full reported results use all 100 OASBUD patients,
+│                                   reproducible via the OASBUD_PATH override, see Setup below)
 │
 ├── Project Figures/                Figures from Phases 3-6 and the Simulink diagram
 │
 ├── Project_Documentation.docx      Complete project report (background, methodology, results, references)
 │
+├── .gitignore
 └── README.md
 ```
 
@@ -156,14 +165,59 @@ setenv('CUDA_PATH', 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6');
 # Activate environment
 source ~/holoscan-env-310/bin/activate && ulimit -s 32768
 
-# Run full pipeline
-python3 ~/project/medical_imaging_pipeline.py
+# Run from inside the cloned repo's Holoscan/ folder.
+# No path editing needed -- both scripts default to the bundled
+# 10-patient sample in data/sample/OASBUD_sample.mat and the
+# ONNX model already committed under MATLAB Codes/.
+cd realtime-ultrasound-holoscan/Holoscan
+pip install -r requirements.txt   # holoscan, onnxruntime-gpu, scipy, pillow, matplotlib
 
-# Run Phase 6 benchmark
-python3 ~/project/Phase6_Pipeline_Benchmark.py
+# Run the full pipeline (10 sample frames)
+python3 medical_imaging_pipeline.py 10
+
+# Run the Phase 6 timing benchmark (10 sample frames)
+python3 Phase6_Pipeline_Benchmark.py
 ```
 
+To reproduce the full reported results (100 OASBUD patients, full BUSI/BUS-UCLM/etc.
+training set), point the scripts at the full datasets instead of the bundled sample
+via environment variables -- no code edits required:
+
+```bash
+export OASBUD_PATH="/path/to/full/OASBUD.mat"
+export ONNX_MODEL_PATH="/path/to/trainedMobileNetV2_mega.onnx"   # optional, defaults to the committed model
+export RESULTS_DIR="/path/to/output/folder"                      # optional, defaults next to the script
+python3 medical_imaging_pipeline.py 100
+```
+
+The full OASBUD dataset [1], BUSI [2], BUS-UCLM [3], BUS-BRA [4], and BrEaST [5]
+datasets used for full evaluation and training are not bundled in this repository due
+to size; see the dataset references below for download links.
+
 Requirements: WSL2 Ubuntu 24.10, Python 3.10, Holoscan 4.2.0, ONNX Runtime GPU.
+
+---
+
+## Quick Test / Verification
+
+After installing requirements, run the pipeline on the bundled 10-frame sample to verify
+the setup end-to-end. The sample is deliberately kept at 10 patients (5 malignant, 5 benign)
+rather than the full 100: each OASBUD patient record is large (~3.1 MB), so 10 patients
+already lands at ~31 MB, comfortably under GitHub's 50 MB soft-warning threshold while
+still giving a class-balanced smoke test. This is meant to verify correctness, not
+reproduce the full benchmark numbers reported above -- for that, run against the full
+dataset via `OASBUD_PATH` (see Setup).
+
+```bash
+cd realtime-ultrasound-holoscan/Holoscan
+python3 medical_imaging_pipeline.py 10
+```
+
+Expected output: a per-frame table (true label, prediction, confidence) for all 10 sample
+patients, followed by a summary block reporting overall accuracy, malignant/benign recall,
+average frame latency, and throughput in fps. Console output ending in `Pipeline Summary`
+with no exceptions confirms the model, data loader, and ONNX runtime are all working
+correctly. Results are also saved to `Holoscan/pipeline_results.npy`.
 
 ---
 
@@ -208,3 +262,20 @@ Requirements: WSL2 Ubuntu 24.10, Python 3.10, Holoscan 4.2.0, ONNX Runtime GPU.
 [8] MathWorks. MATLAB R2024b, including the Deep Learning Toolbox, Image Processing Toolbox, GPU Coder, and Phased Array System Toolbox.
 
 [9] NVIDIA Corporation. NVIDIA Holoscan SDK, version 4.2.0.
+
+---
+
+## Generative AI Usage
+
+Generative AI (Claude, Anthropic) was used during this project to assist with debugging
+(ONNX inference normalisation/softmax issues, GPU Coder environment configuration),
+pipeline integration, and documentation drafting. All technical decisions, beamforming
+corrections, model architecture choices, and reported results were reviewed, tested, and
+verified by the author. The author can explain and reproduce all code in this repository.
+
+---
+
+## Contact
+
+Rohith Ram V -- 24BCE0543, B.Tech CSE, VIT Vellore
+GitHub: [@rohithgreninja-afk](https://github.com/rohithgreninja-afk)
