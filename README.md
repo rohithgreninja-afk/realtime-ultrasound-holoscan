@@ -47,11 +47,17 @@ The 3x3 median filter was selected and is the `EnhancementOp` stage in the deplo
 
 ---
 
-## Simulink Representation
+## Simulink
 
-The same five-stage pipeline (DataSource -> Beamforming -> Enhancement -> Inference -> Output) is also expressed as a Simulink block diagram, `Simulink/UltrasoundPipelineDiagram.slx`. This is an illustrative architecture diagram only: it contains plain labelled blocks with no underlying `matlab.System` classes, no executable logic, and no simulation behaviour of any kind, it exists purely to visualise the pipeline structure. The actual real-time execution path remains the Holoscan pipeline described above.
+Two Simulink models are included in the `Simulink/` folder.
+
+**UltrasoundPipelineDiagram.slx** is an architecture-level block diagram showing the complete five-stage pipeline (DataSource, Beamforming, Enhancement, Inference, Output) in sequence, mirroring the deployed Holoscan structure. It serves as a visual reference for the pipeline architecture.
+
+**UltrasoundEnhancementSubsystem.slx** is a fully functional Simulink model that simulates the core image processing subsystem using executable MATLAB Function blocks. A From Workspace source feeds a real OASBUD patient RF matrix into two sequential blocks: EnvelopeDetection (Hilbert transform, 20 log10 compression, dynamic range normalisation) and Enhancement (3x3 median filter, PSNR 24.77 dB, SSIM 0.4011, output scaled 0-255). A To Workspace sink captures the result. The model was simulated in MATLAB R2024b with MSVC 2022, producing a 1824x510 enhanced B-mode image (values 0-253). Simulink was used for architectural representation and functional subsystem validation; all CNN training, GPU Coder acceleration, and real-time deployment were performed in MATLAB and Holoscan.
 
 ![Simulink Pipeline Diagram](Project%20Figures/Simulink/Simulink_Pipeline_Diagram_Simple.png)
+
+![Simulink Functional Output](Project%20Figures/Simulink_Functional_Output.png)
 
 ---
 
@@ -125,7 +131,8 @@ realtime-ultrasound-holoscan/
 │   └── requirements.txt            Python dependencies for the Holoscan pipeline
 │
 ├── Simulink/
-│   └── UltrasoundPipelineDiagram.slx  Five-stage architecture diagram (illustrative only, no executable logic)
+│   ├── UltrasoundPipelineDiagram.slx        Five-stage architecture diagram (visual reference)
+│   └── UltrasoundEnhancementSubsystem.slx   Functional model -- envelope detection + median filter simulated in MATLAB R2024b
 │
 ├── data/
 │   └── sample/
