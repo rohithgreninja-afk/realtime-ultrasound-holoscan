@@ -12,8 +12,17 @@ mex -setup:'C:\Program Files\MATLAB\R2024b\bin\win64\mexopts\msvcpp2022.xml' C++
 fprintf('Environment configured: VS2022 + CUDA 12.6\n');
 % ─────────────────────────────────────────────────────────
 
-% ── Load data ─────────────────────────────────────────────
-load('C:\Users\rohit\Downloads\Real Time Image Processing Project\OASBUD.mat');
+% ── Resolve script location (repo-relative, portable) ─────
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+
+% ── Load data (OASBUD_PATH override, defaults to bundled sample) ──
+oasbudPath = getenv('OASBUD_PATH');
+if isempty(oasbudPath)
+    oasbudPath = fullfile(repoRoot, 'data', 'sample', 'OASBUD_sample.mat');
+    fprintf('OASBUD_PATH not set, using bundled sample: %s\n', oasbudPath);
+end
+load(oasbudPath);
 
 % ── Define acquisition parameters ────────────────────────
 fs    = 25e6;       % Sampling frequency: 25 MHz
@@ -42,8 +51,8 @@ arg_x_image    = coder.typeof(x_image,    [1, 200],                    [0 0]);
 arg_fs         = coder.typeof(fs);
 arg_c          = coder.typeof(c);
 
-% ── Set working directory to MATLAB Code folder ───────────
-cd('C:\Users\rohit\Documents\MATLAB Code');
+% ── Set working directory to this script's folder ─────────
+cd(scriptDir);
 
 % ── Configure GPU Coder ───────────────────────────────────
 cfg = coder.gpuConfig('lib');
@@ -62,7 +71,7 @@ codegen('das_beamform', '-config', cfg, '-args', ...
 fprintf('CUDA code generation complete.\n');
 
 % ── Show generated files ──────────────────────────────────
-genDir = 'C:\Users\rohit\Documents\MATLAB Code\codegen\lib\das_beamform';
+genDir = fullfile(scriptDir, 'codegen', 'lib', 'das_beamform');
 fprintf('\nGenerated files:\n');
 files = dir(genDir);
 for i = 1:length(files)
