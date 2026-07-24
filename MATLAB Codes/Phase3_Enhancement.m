@@ -194,7 +194,7 @@ fprintf('=========================================\n');
 % ── Final: Save enhanced image and produce summary figure ─
 bmode_enhanced = bmode_median;
 
-% Save for use in Phase 4
+% Save for use in Phase 4 (local intermediate artifact, gitignored)
 save('bmode_enhanced.mat', 'bmode_enhanced', 'x_image', 'z_image');
 fprintf('Enhanced image saved to bmode_enhanced.mat\n');
 
@@ -219,8 +219,10 @@ sgtitle('Phase 3 Final — Selected Enhancement Pipeline', ...
 fprintf('\nPhase 3 complete. Selected filter: Median 3x3\n');
 fprintf('PSNR: %.2f dB  |  SSIM: %.4f\n', psnr_median, ssim_median);
 
-% Save all Phase 3 figures to disk
-outputFolder = 'C:\Users\rohit\Documents\MATLAB Code\Project_Figures\Phase3';
+% Save all Phase 3 figures to disk (repo-relative)
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+outputFolder = fullfile(repoRoot, 'Project Figures', 'Phase3');
 if ~exist(outputFolder, 'dir'), mkdir(outputFolder); end
 
 figure(2); saveas(gcf, fullfile(outputFolder, 'Step1_Median_Filter.png'));
