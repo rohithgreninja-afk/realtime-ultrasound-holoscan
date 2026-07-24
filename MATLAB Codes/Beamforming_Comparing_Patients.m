@@ -14,9 +14,9 @@ end
 load(oasbudPath);
 
 % Define acquisition parameters
-fs    = 25e6;       % Sampling frequency: 25 MHz
+fs    = 40e6;       % Sampling frequency: 40 MHz
 c     = 1540;       % Speed of sound in soft tissue (m/s)
-pitch = 0.245e-3;   % Element spacing: 0.245 mm
+pitch = 0.30e-3;    % Element spacing: 0.30 mm
 
 % ── Element and image grid ────────────────────────────────
 rf = data(1).rf1;
@@ -42,7 +42,7 @@ if ~exist('bmode', 'var')
                 dx = x_image(ix) - x_elements(ie);
                 dz = z_image(iz);
                 dist = sqrt(dx^2 + dz^2);
-                sample_idx = round((dist / c) * fs) + 1;
+                sample_idx = round((2 * dist / c) * fs) + 1;
                 if sample_idx >= 1 && sample_idx <= num_samples
                     pixel_sum = pixel_sum + rf(sample_idx, ie);
                 end
@@ -90,7 +90,7 @@ if ~exist('bmode_b', 'var')
                 dx = x_image(ix) - x_elements(ie);
                 dz = z_image(iz);
                 dist = sqrt(dx^2 + dz^2);
-                sample_idx = round((dist / c) * fs) + 1;
+                sample_idx = round((2 * dist / c) * fs) + 1;
                 if sample_idx >= 1 && sample_idx <= num_samples
                     pixel_sum = pixel_sum + rf_b(sample_idx, ie);
                 end
