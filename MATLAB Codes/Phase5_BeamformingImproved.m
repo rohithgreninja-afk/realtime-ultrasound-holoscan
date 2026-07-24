@@ -42,7 +42,7 @@ dx2  = reshape(x_image, [1 nx 1]) - reshape(x_elements, [1 1 N]);
 dz2  = reshape(z_image, [nz 1 1]);
 dist = sqrt(dx2.^2 + dz2.^2);
 
-sample_idx = round((dist / c) * fs) + 1;
+sample_idx = round((2 * dist / c) * fs) + 1;
 sample_idx = max(1, min(size(rf,1), sample_idx));
 
 %% -------------------------------------------------------------------------
@@ -163,7 +163,7 @@ for p = 1:3
     dx2_p  = reshape(x_image, [1 nx 1]) - reshape(x_elements, [1 1 N]);
     dz2_p  = reshape(z_p, [nz 1 1]);
     dist_p = sqrt(dx2_p.^2 + dz2_p.^2);
-    idx_p  = max(1, min(ns_p, round((dist_p / c) * fs) + 1));
+    idx_p  = max(1, min(ns_p, round((2 * dist_p / c) * fs) + 1));
 
     rfc_p = hilbert(rf_p);
     das_p = zeros(nz, nx);
