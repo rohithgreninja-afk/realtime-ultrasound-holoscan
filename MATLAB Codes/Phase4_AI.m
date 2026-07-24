@@ -3,7 +3,12 @@
 % AI-Based Classification using BUSI Dataset
 % =========================================================
 
-innerPath = 'C:\Users\rohit\OneDrive\Documents\MATLAB\Examples\R2026a\supportfiles\image\data\Dataset_BUSI\Dataset_BUSI_with_GT';
+innerPath = getenv('BUSI_PATH');
+if isempty(innerPath)
+    error(['BUSI_PATH environment variable not set. This script requires ' ...
+           'the BUSI dataset (bundled with MATLAB support files or downloaded ' ...
+           'separately). Set it with: setenv(''BUSI_PATH'', ''/path/to/Dataset_BUSI_with_GT'')']);
+end
 
 % Check dataset is accessible
 if ~exist(innerPath, 'dir')
@@ -223,7 +228,9 @@ save('trainedMobileNetV2.mat', 'trainedNet', 'trainInfo');
 fprintf('\nTrained network saved to trainedMobileNetV2.mat\n');
 
 % ── Save all Phase 4 figures ──────────────────────────────
-outputFolder = 'C:\Users\rohit\Documents\MATLAB Code\Project_Figures\Phase4';
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+outputFolder = fullfile(repoRoot, 'Project Figures', 'Phase4');
 if ~exist(outputFolder, 'dir'), mkdir(outputFolder); end
 
 % Save confusion matrix
