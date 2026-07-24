@@ -20,9 +20,9 @@ end
 load(oasbudPath);
 
 % ── Acquisition parameters ───────────────────────────────
-fs    = 25e6;
+fs    = 40e6;
 c     = 1540;
-pitch = 0.245e-3;
+pitch = 0.30e-3;
 
 % ── Patient 1 (Malignant) ────────────────────────────────
 rf = data(1).rf1;
