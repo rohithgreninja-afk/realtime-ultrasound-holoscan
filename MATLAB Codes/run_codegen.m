@@ -25,9 +25,12 @@ end
 load(oasbudPath);
 
 % ── Define acquisition parameters ────────────────────────
-fs    = 25e6;       % Sampling frequency: 25 MHz
-c     = 1540;       % Speed of sound in soft tissue (m/s)
-pitch = 0.245e-3;   % Element spacing: 0.245 mm
+% Per the OASBUD paper (Piotrzkowska-Wroblewska et al.): Ultrasonix
+% SonixTouch with L14-5/38 linear array, 40 MHz sampling frequency,
+% 0.30 mm element pitch.
+fs    = 40e6;        % Sampling frequency: 40 MHz
+c     = 1540;        % Speed of sound in soft tissue (m/s)
+pitch = 0.30e-3;     % Element spacing: 0.30 mm (L14-5/38 transducer)
 
 % ── Build image grids ─────────────────────────────────────
 rf = data(1).rf1;
