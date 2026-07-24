@@ -1,8 +1,16 @@
-data=load('C:\Users\rohit\Downloads\Real Time Image Processing Project\OASBUD.mat');
+% Resolve OASBUD path: OASBUD_PATH env var override, defaults to bundled sample
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+filePath  = getenv('OASBUD_PATH');
+if isempty(filePath)
+    filePath = fullfile(repoRoot, 'data', 'sample', 'OASBUD_sample.mat');
+    fprintf('OASBUD_PATH not set, using bundled sample: %s\n', filePath);
+end
+
+data = load(filePath);
 disp(fieldnames(data));
 
 %size and type of data in the file
-filePath = 'C:\Users\rohit\Downloads\Real Time Image Processing Project\OASBUD.mat';
 load(filePath);
 disp(class(data));
 disp(size(data));
@@ -33,7 +41,7 @@ fprintf('Number of elements: %d\n', size(data(1).rf1, 2));
 
 %check if dataset has seperate field for sampling freq.
 
-load('C:\Users\rohit\Downloads\Real Time Image Processing Project\OASBUD.mat');
+load(filePath);
 whos
 
 %Defining acquistion parameters
