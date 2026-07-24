@@ -1,13 +1,20 @@
 % Phase5_BeamformingImproved.m
 % Reconstruction comparison with fixed normalization and compression options
-% Save as: C:\Users\rohit\Documents\MATLAB Code\Phase5_BeamformingImproved.m
 
 clearvars; clc;
+
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
 
 %% -------------------------------------------------------------------------
 % SECTION 1: Load OASBUD data
 % -------------------------------------------------------------------------
-data   = load('C:\Users\rohit\Downloads\Real Time Image Processing Project\OASBUD.mat');
+oasbudPath = getenv('OASBUD_PATH');
+if isempty(oasbudPath)
+    oasbudPath = fullfile(repoRoot, 'data', 'sample', 'OASBUD_sample.mat');
+    fprintf('OASBUD_PATH not set, using bundled sample: %s\n', oasbudPath);
+end
+data = load(oasbudPath);
 
 patIdx = 1;
 rf     = double(data.data(patIdx).rf1);
@@ -135,7 +142,9 @@ end
 sgtitle(sprintf('Patient %d (Class %d) -- Compression Comparison', ...
     patIdx, data.data(patIdx).class));
 
-saveas(gcf, 'C:\Users\rohit\Documents\MATLAB Code\Project_Figures\Phase5\beamforming_compression_comparison.png');
+figOutputFolder = fullfile(repoRoot, 'Project Figures', 'Phase5');
+if ~exist(figOutputFolder, 'dir'), mkdir(figOutputFolder); end
+saveas(gcf, fullfile(figOutputFolder, 'beamforming_compression_comparison.png'));
 fprintf('Figure saved\n');
 
 %% -------------------------------------------------------------------------
@@ -182,5 +191,5 @@ for p = 1:3
 end
 
 sgtitle('DAS + Power Law (γ=0.3) -- Patients 1-3');
-saveas(gcf, 'C:\Users\rohit\Documents\MATLAB Code\Project_Figures\Phase5\multipatient_powerlaw.png');
+saveas(gcf, fullfile(figOutputFolder, 'multipatient_powerlaw.png'));
 fprintf('Done\n');
