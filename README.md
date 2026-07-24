@@ -31,6 +31,54 @@ OutputOp            -- record prediction, print summary, save results
 
 ---
 
+## Dataset Strategy: Why OASBUD and the Plane-Wave Phantom Dataset Serve Different Roles
+
+This project deliberately uses two different raw ultrasound sources for two different
+purposes, rather than one dataset for everything. Both limitations below were confirmed
+experimentally, not assumed; see `Project_Documentation.docx`, Section 13.3, for the
+full test methodology and result figures.
+
+### Why OASBUD is not used for GPU-accelerated delay-and-sum beamforming or the Phased Array System Toolbox
+
+OASBUD's radio frequency data looks like raw sensor output, but it is not raw per-element
+transducer channel data. Each of its 510 columns is already a pre-formed scan line: the
+original clinical scanner had already run its own beamforming before the data was saved.
+There is no raw array-element geometry left in the data for delay-and-sum, the GPU
+Coder-generated CUDA kernel (`das_beamform.cu`), or any Phased Array System Toolbox
+beamformer (`phased.PhaseShiftBeamformer` and similar) to operate on correctly. Running
+any of these against OASBUD, correct physics or not, produces an incoherent image with
+no diagnostic value, confirmed directly by reconstructing real OASBUD data both ways and
+comparing the result. The correct and only method used for OASBUD anywhere in this
+project is per-column Hilbert envelope detection with power-law compression
+(`BeamformingOp`, GPU Coder-accelerated via `aline_reconstruct.m`, see below), which
+involves no delay calculation and no array geometry assumption.
+
+### Why the plane-wave phantom dataset cannot replace OASBUD for classification accuracy
+
+The Ultrasound Plane Wave Raw Data, 75 Angles dataset [6] is genuine raw per-element
+channel data, which is exactly what OASBUD is not, making it the correct data source for
+demonstrating GPU Coder CUDA acceleration and the Phased Array System Toolbox on
+delay-and-sum-family methods. But it is acquired from physical test phantoms (a
+multi-purpose calibration phantom and a breast-mimicking phantom), not patient tissue,
+and carries no malignant or benign labels of any kind. Its built-in categories
+(hyperechoic, hypoechoic, no lesion) describe physical reflectivity properties used to
+check image resolution and contrast, not a diagnosis. This dataset therefore cannot
+contribute to, substitute for, or validate any part of this project's
+malignant/benign/normal classification accuracy.
+
+### The resulting split
+
+| | OASBUD | Plane-wave phantom dataset [6] |
+|---|---|---|
+| Data type | Pre-formed scan lines | Raw per-element channel data |
+| Used for | AI classification (malignant/benign), via GPU Coder-accelerated per-column Hilbert | Delay-and-sum GPU Coder CUDA + Phased Array System Toolbox demonstration (planned) |
+| Not used for | Delay-and-sum beamforming, Phased Array System Toolbox | Any classification accuracy claim (no disease labels exist) |
+
+The two datasets are not interchangeable in either direction, and this project does not
+claim otherwise anywhere in the pipeline, results, or documentation.
+
+---
+
 ## GPU Coder CUDA Acceleration
 
 The reconstruction method used for OASBUD, per-column Hilbert envelope detection and
