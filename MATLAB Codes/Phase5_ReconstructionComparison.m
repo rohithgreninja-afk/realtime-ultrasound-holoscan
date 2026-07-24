@@ -10,7 +10,14 @@
 %   6. MVBF (Minimum Variance Beamformer) — slow, runs last
 % =========================================================
 
-load('C:\Users\rohit\Downloads\Real Time Image Processing Project\OASBUD.mat');
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+oasbudPath = getenv('OASBUD_PATH');
+if isempty(oasbudPath)
+    oasbudPath = fullfile(repoRoot, 'data', 'sample', 'OASBUD_sample.mat');
+    fprintf('OASBUD_PATH not set, using bundled sample: %s\n', oasbudPath);
+end
+load(oasbudPath);
 
 % ── Acquisition parameters ───────────────────────────────
 fs    = 25e6;
