@@ -9,7 +9,7 @@ Run in WSL2:
   python3 ~/project/Phase6_Pipeline_Benchmark.py
 """
 
-import time, os
+import time, os, sys
 import numpy as np
 import scipy.io as sio
 from scipy.signal import hilbert
@@ -18,6 +18,9 @@ import onnxruntime as ort
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from aline_cuda import aline_reconstruct_cuda, cuda_available
 
 # ---- Paths ----
 _THIS_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -36,14 +39,17 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print('=== Phase 6 Pipeline Benchmark ===')
 print(f'OASBUD : {OASBUD_PATH}')
 print(f'Model  : {ONNX_PATH}')
-print(f'Output : {OUTPUT_DIR}\n')
+print(f'Output : {OUTPUT_DIR}')
+print(f'Beamforming backend : {"CUDA (GPU Coder)" if cuda_available() else "scipy (fallback)"}\n')
 
 # ============================================================
 # Stage functions -- exact copies of Holoscan operator logic
 # ============================================================
 
 def beamform(rf):
-    """BeamformingOp._aline_reconstruct"""
+    """BeamformingOp._aline_reconstruct -- CUDA path if available, scipy fallback otherwise"""
+    if cuda_available():
+        return aline_reconstruct_cuda(rf.astype(np.float64), 0.3).astype(np.float32)
     analytic = hilbert(rf.astype(np.float64), axis=0)
     envelope = np.abs(analytic)
     env_norm = envelope / (envelope.max() + 1e-12)
@@ -155,8 +161,9 @@ print()
 print('=' * 62)
 print('PHASE 6 PIPELINE BENCHMARK')
 print('=' * 62)
-print(f'  Execution provider : {active_ep}')
-print(f'  Frames timed       : {n_patients}')
+print(f'  Execution provider  : {active_ep}')
+print(f'  Beamforming backend : {"CUDA (GPU Coder)" if cuda_available() else "scipy (fallback)"}')
+print(f'  Frames timed        : {n_patients}')
 print()
 print(f'  {"Stage":<22} {"Mean":>7} {"Std":>7} {"Min":>7} {"Max":>7}   ms')
 print(f'  {"-"*22} {"-"*7} {"-"*7} {"-"*7} {"-"*7}')
@@ -208,8 +215,9 @@ for bar, mean in zip(bars, means):
             f'{mean:.2f} ms', ha='center', va='bottom',
             fontsize=11, fontweight='bold')
 ax.set_ylabel('Latency (ms)', fontsize=13)
+backend_label = "CUDA" if cuda_available() else "scipy"
 ax.set_title(
-    f'Pipeline Stage Latency  (n={n_patients} frames)\n'
+    f'Pipeline Stage Latency  (n={n_patients} frames, beamforming: {backend_label})\n'
     f'Total mean: {t_total.mean():.2f} ms  |  {fps_mean:.1f} fps',
     fontsize=13
 )
@@ -271,6 +279,7 @@ np.save(f'{OUTPUT_DIR}/benchmark_timing.npy', {
     'gt':          gt,
     'accuracy':    accuracy,
     'fps':         fps_mean,
+    'beamforming_backend': 'cuda' if cuda_available() else 'scipy',
 })
 print(f'  Saved: benchmark_timing.npy')
 print()
