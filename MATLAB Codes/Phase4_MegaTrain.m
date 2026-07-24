@@ -1,16 +1,22 @@
 % Phase4_MegaTrain.m
 % Combined training: BUSI + BUS-UCLM + BUS-BRA + BrEaST + OASBUD-PNG
-% Save as: C:\Users\rohit\Documents\MATLAB Code\Phase4_MegaTrain.m
 % Run with R2024b only
 
 clearvars; clc;
+
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+
 addpath(genpath('C:\ProgramData\MATLAB\SupportPackages\R2024b\toolbox\nnet\supportpackages\mobilenetv2'));
 
 %% -------------------------------------------------------------------------
 % SECTION 1: BUSI
 % -------------------------------------------------------------------------
-busiPath = fullfile('C:\Users\rohit\OneDrive\Documents\MATLAB\Examples\R2026a', ...
-    'supportfiles\image\data\Dataset_BUSI\Dataset_BUSI_with_GT');
+busiPath = getenv('BUSI_PATH');
+if isempty(busiPath)
+    error(['BUSI_PATH environment variable not set. Set it with: ' ...
+           'setenv(''BUSI_PATH'', ''/path/to/Dataset_BUSI_with_GT'')']);
+end
 
 busiDS = imageDatastore(busiPath, 'IncludeSubfolders', true, ...
     'LabelSource', 'foldernames', 'FileExtensions', '.png');
@@ -25,9 +31,11 @@ disp(countcats(busiDS.Labels));
 %% -------------------------------------------------------------------------
 % SECTION 2: BUS-UCLM
 % -------------------------------------------------------------------------
-uclmRoot = fullfile('C:\Users\rohit\Downloads\Real Time Image Processing Project', ...
-    'BUS-UCLM Breast ultrasound lesion segmentation dataset', ...
-    'BUS-UCLM Breast ultrasound lesion segmentation dataset', 'BUS-UCLM');
+uclmRoot = getenv('BUS_UCLM_PATH');
+if isempty(uclmRoot)
+    error(['BUS_UCLM_PATH environment variable not set. Set it with: ' ...
+           'setenv(''BUS_UCLM_PATH'', ''/path/to/BUS-UCLM'')']);
+end
 
 info     = readtable(fullfile(uclmRoot, 'INFO.csv'));
 cleanIdx = strcmp(info.Doppler, 'No');
@@ -43,7 +51,11 @@ disp(countcats(uclmDS.Labels));
 %% -------------------------------------------------------------------------
 % SECTION 3: BUS-BRA
 % -------------------------------------------------------------------------
-busbraRoot   = 'C:\Users\rohit\Downloads\Real Time Image Processing Project\BUSBRA\BUSBRA';
+busbraRoot = getenv('BUSBRA_PATH');
+if isempty(busbraRoot)
+    error(['BUSBRA_PATH environment variable not set. Set it with: ' ...
+           'setenv(''BUSBRA_PATH'', ''/path/to/BUSBRA'')']);
+end
 busbraImgDir = fullfile(busbraRoot, 'Images');
 busbraCSV    = fullfile(busbraRoot, 'bus_data.csv');
 
@@ -66,11 +78,13 @@ disp(countcats(busbraDS.Labels));
 %% -------------------------------------------------------------------------
 % SECTION 4: BrEaST
 % -------------------------------------------------------------------------
-breastImgDir = fullfile('C:\Users\rohit\Downloads\Real Time Image Processing Project', ...
-    'BrEaST-Lesions_USG-images_and_masks-Dec-15-2023', ...
-    'BrEaST-Lesions_USG-images_and_masks');
-breastXLSX = fullfile('C:\Users\rohit\Downloads\Real Time Image Processing Project', ...
-    'BrEaST-Lesions-USG-clinical-data-Dec-15-2023.xlsx');
+breastImgDir = getenv('BREAST_IMG_PATH');
+breastXLSX   = getenv('BREAST_XLSX_PATH');
+if isempty(breastImgDir) || isempty(breastXLSX)
+    error(['BREAST_IMG_PATH and BREAST_XLSX_PATH environment variables not set. Set with: ' ...
+           'setenv(''BREAST_IMG_PATH'', ''/path/to/BrEaST-Lesions_USG-images_and_masks''); ' ...
+           'setenv(''BREAST_XLSX_PATH'', ''/path/to/BrEaST-Lesions-USG-clinical-data-Dec-15-2023.xlsx'')']);
+end
 
 breastInfo  = readtable(breastXLSX);
 imgFiles    = breastInfo.Image_filename;
@@ -90,7 +104,11 @@ disp(countcats(breastDS.Labels));
 %% -------------------------------------------------------------------------
 % SECTION 5: OASBUD PNG (augmented reconstructions)
 % -------------------------------------------------------------------------
-oasbRoot = 'C:\Users\rohit\Downloads\OASBUD_PNG';
+oasbRoot = getenv('OASBUD_PNG_PATH');
+if isempty(oasbRoot)
+    oasbRoot = fullfile(repoRoot, 'data', 'OASBUD_PNG');
+    fprintf('OASBUD_PNG_PATH not set, defaulting to %s\n', oasbRoot);
+end
 
 if exist(oasbRoot, 'dir')
     oasbDS = imageDatastore(oasbRoot, 'IncludeSubfolders', true, ...
@@ -246,17 +264,19 @@ confusionchart(testDS.Labels, testPreds, ...
     'RowSummary',    'row-normalized', ...
     'ColumnSummary', 'column-normalized');
 
-saveas(gcf, 'C:\Users\rohit\Documents\MATLAB Code\Project_Figures\Phase4\confusion_matrix_mega.png');
+figOutputFolder = fullfile(repoRoot, 'Project Figures', 'Phase4');
+if ~exist(figOutputFolder, 'dir'), mkdir(figOutputFolder); end
+saveas(gcf, fullfile(figOutputFolder, 'confusion_matrix_mega.png'));
 fprintf('Confusion matrix saved\n');
 
 %% -------------------------------------------------------------------------
 % SECTION 15: Save and export ONNX
 % -------------------------------------------------------------------------
-save('C:\Users\rohit\Documents\MATLAB Code\trainedMobileNetV2_mega.mat', ...
+save(fullfile(scriptDir, 'trainedMobileNetV2_mega.mat'), ...
      'trainedNet', 'trainInfo', 'classNames');
 fprintf('Model saved: trainedMobileNetV2_mega.mat\n');
 
 setenv('PATH', [getenv('PATH') ';C:\ProgramData\MATLAB\SupportPackages\R2024b\bin\win64']);
 addpath(genpath('C:\ProgramData\MATLAB\SupportPackages\R2024b\toolbox\nnet\supportpackages\onnx'));
-exportONNXNetwork(trainedNet, 'C:\Users\rohit\Documents\MATLAB Code\trainedMobileNetV2_mega.onnx');
+exportONNXNetwork(trainedNet, fullfile(scriptDir, 'trainedMobileNetV2_mega.onnx'));
 fprintf('ONNX exported: trainedMobileNetV2_mega.onnx\n');
