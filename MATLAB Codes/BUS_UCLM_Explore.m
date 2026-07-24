@@ -3,7 +3,12 @@
 % Explore and audit the BUS-UCLM dataset structure
 % =========================================================
 
-busUCLMPath = 'C:\Users\rohit\Downloads\Real Time Image Processing Project\BUS-UCLM Breast ultrasound lesion segmentation dataset\BUS-UCLM Breast ultrasound lesion segmentation dataset\BUS-UCLM';
+busUCLMPath = getenv('BUS_UCLM_PATH');
+if isempty(busUCLMPath)
+    error(['BUS_UCLM_PATH environment variable not set. This script requires ' ...
+           'the full BUS-UCLM dataset, which is not bundled in this repo. ' ...
+           'Set it with: setenv(''BUS_UCLM_PATH'', ''/path/to/BUS-UCLM'')']);
+end
 
 % ── Read INFO.csv ─────────────────────────────────────────
 info = readtable(fullfile(busUCLMPath, 'INFO.csv'));
