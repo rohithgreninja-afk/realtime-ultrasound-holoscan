@@ -2,13 +2,26 @@
 % Export 20 malignant + 20 benign OASBUD patients as PNG training images
 % Uses A-line reconstruction (hilbert + power law) -- same as pipeline
 % Applies heavy augmentation to each patient to generate multiple images
-% Output: C:\Users\rohit\Downloads\OASBUD_PNG\malignant\ and \benign\
+% Output: OASBUD_PNG_PATH/malignant/ and /benign/
 
 clearvars; clc;
 
 %% Settings
-dataPath   = 'C:\Users\rohit\Downloads\Real Time Image Processing Project\OASBUD.mat';
-outRoot    = 'C:\Users\rohit\Downloads\OASBUD_PNG';
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+
+dataPath = getenv('OASBUD_PATH');
+if isempty(dataPath)
+    dataPath = fullfile(repoRoot, 'data', 'sample', 'OASBUD_sample.mat');
+    fprintf('OASBUD_PATH not set, using bundled sample: %s\n', dataPath);
+end
+
+outRoot = getenv('OASBUD_PNG_PATH');
+if isempty(outRoot)
+    outRoot = fullfile(repoRoot, 'data', 'OASBUD_PNG');
+    fprintf('OASBUD_PNG_PATH not set, defaulting to %s\n', outRoot);
+end
+
 fs         = 40e6;
 c          = 1540;
 probeWidth = 38e-3;
