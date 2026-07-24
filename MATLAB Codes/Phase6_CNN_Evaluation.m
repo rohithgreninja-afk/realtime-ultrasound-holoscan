@@ -12,26 +12,45 @@
 clearvars; close all; clc;
 
 %% ===== PATHS =====
-matlabCodeDir = 'C:\Users\rohit\Documents\MATLAB Code\';
-matFilePath   = fullfile(matlabCodeDir, 'trainedMobileNetV2_mega.mat');
-figDir        = fullfile(matlabCodeDir, 'Project_Figures', 'Phase6');
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+
+matFilePath = fullfile(scriptDir, 'trainedMobileNetV2_mega.mat');
+figDir      = fullfile(repoRoot, 'Project Figures', 'Phase6');
 if ~exist(figDir,'dir'), mkdir(figDir); end
 
-busiRoot   = ['C:\Users\rohit\OneDrive\Documents\MATLAB\Examples\R2026a\supportfiles\' ...
-              'image\data\Dataset_BUSI\Dataset_BUSI_with_GT\'];
-uclmRoot   = ['C:\Users\rohit\Downloads\Real Time Image Processing Project\' ...
-              'BUS-UCLM Breast ultrasound lesion segmentation dataset\' ...
-              'BUS-UCLM Breast ultrasound lesion segmentation dataset\BUS-UCLM\'];
-busbraRoot = ['C:\Users\rohit\Downloads\Real Time Image Processing Project\' ...
-              'BUSBRA\BUSBRA\'];
-breastRoot = ['C:\Users\rohit\Downloads\Real Time Image Processing Project\' ...
-              'BrEaST-Lesions_USG-images_and_masks-Dec-15-2023\' ...
-              'BrEaST-Lesions_USG-images_and_masks\'];
-breastXLSX = ['C:\Users\rohit\Downloads\Real Time Image Processing Project\' ...
-              'BrEaST-Lesions-USG-clinical-data-Dec-15-2023.xlsx'];
-oasbud_png = 'C:\Users\rohit\Downloads\OASBUD_PNG\';
-oasbud_mat = ['C:\Users\rohit\Downloads\Real Time Image Processing Project\' ...
-              'OASBUD.mat'];
+busiRoot = getenv('BUSI_PATH');
+if isempty(busiRoot)
+    error(['BUSI_PATH environment variable not set. Set it with: ' ...
+           'setenv(''BUSI_PATH'', ''/path/to/Dataset_BUSI_with_GT'')']);
+end
+uclmRoot = getenv('BUS_UCLM_PATH');
+if isempty(uclmRoot)
+    error(['BUS_UCLM_PATH environment variable not set. Set it with: ' ...
+           'setenv(''BUS_UCLM_PATH'', ''/path/to/BUS-UCLM'')']);
+end
+busbraRoot = getenv('BUSBRA_PATH');
+if isempty(busbraRoot)
+    error(['BUSBRA_PATH environment variable not set. Set it with: ' ...
+           'setenv(''BUSBRA_PATH'', ''/path/to/BUSBRA'')']);
+end
+breastRoot = getenv('BREAST_IMG_PATH');
+breastXLSX = getenv('BREAST_XLSX_PATH');
+if isempty(breastRoot) || isempty(breastXLSX)
+    error(['BREAST_IMG_PATH and BREAST_XLSX_PATH environment variables not set. Set with: ' ...
+           'setenv(''BREAST_IMG_PATH'', ''/path/to/BrEaST-Lesions_USG-images_and_masks''); ' ...
+           'setenv(''BREAST_XLSX_PATH'', ''/path/to/BrEaST-Lesions-USG-clinical-data-Dec-15-2023.xlsx'')']);
+end
+oasbud_png = getenv('OASBUD_PNG_PATH');
+if isempty(oasbud_png)
+    oasbud_png = fullfile(repoRoot, 'data', 'OASBUD_PNG');
+    fprintf('OASBUD_PNG_PATH not set, defaulting to %s\n', oasbud_png);
+end
+oasbud_mat = getenv('OASBUD_PATH');
+if isempty(oasbud_mat)
+    oasbud_mat = fullfile(repoRoot, 'data', 'sample', 'OASBUD_sample.mat');
+    fprintf('OASBUD_PATH not set, using bundled sample: %s\n', oasbud_mat);
+end
 
 fprintf('=== Phase 6 CNN Evaluation ===\n');
 fprintf('Figures -> %s\n\n', figDir);
