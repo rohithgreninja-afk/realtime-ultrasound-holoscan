@@ -5,13 +5,19 @@
 
 clearvars; clc;
 
+scriptDir = fileparts(mfilename('fullpath'));
+repoRoot  = fileparts(scriptDir);
+
 addpath(genpath('C:\ProgramData\MATLAB\SupportPackages\R2024b\toolbox\nnet\supportpackages\mobilenetv2'));
 
 %% -------------------------------------------------------------------------
 % SECTION 1: Load BUSI dataset
 % -------------------------------------------------------------------------
-busiPath = fullfile('C:\Users\rohit\OneDrive\Documents\MATLAB\Examples\R2026a', ...
-    'supportfiles\image\data\Dataset_BUSI\Dataset_BUSI_with_GT');
+busiPath = getenv('BUSI_PATH');
+if isempty(busiPath)
+    error(['BUSI_PATH environment variable not set. Set it with: ' ...
+           'setenv(''BUSI_PATH'', ''/path/to/Dataset_BUSI_with_GT'')']);
+end
 
 busiDS = imageDatastore(busiPath, ...
     'IncludeSubfolders', true, ...
@@ -33,10 +39,11 @@ disp(countcats(busiDS.Labels));
 %% -------------------------------------------------------------------------
 % SECTION 2: Load BUS-UCLM dataset
 % -------------------------------------------------------------------------
-uclmRoot = fullfile('C:\Users\rohit\Downloads\Real Time Image Processing Project', ...
-    'BUS-UCLM Breast ultrasound lesion segmentation dataset', ...
-    'BUS-UCLM Breast ultrasound lesion segmentation dataset', ...
-    'BUS-UCLM');
+uclmRoot = getenv('BUS_UCLM_PATH');
+if isempty(uclmRoot)
+    error(['BUS_UCLM_PATH environment variable not set. Set it with: ' ...
+           'setenv(''BUS_UCLM_PATH'', ''/path/to/BUS-UCLM'')']);
+end
 
 uclmImagesPath = fullfile(uclmRoot, 'images');
 infoFile       = fullfile(uclmRoot, 'INFO.csv');
@@ -194,17 +201,19 @@ confusionchart(testDS.Labels, testPreds, ...
     'RowSummary',    'row-normalized', ...
     'ColumnSummary', 'column-normalized');
 
-saveas(gcf, 'C:\Users\rohit\Documents\MATLAB Code\Project_Figures\Phase4\confusion_matrix_w3.png');
+figOutputFolder = fullfile(repoRoot, 'Project Figures', 'Phase4');
+if ~exist(figOutputFolder, 'dir'), mkdir(figOutputFolder); end
+saveas(gcf, fullfile(figOutputFolder, 'confusion_matrix_w3.png'));
 fprintf('Confusion matrix saved\n');
 
 %% -------------------------------------------------------------------------
 % SECTION 12: Save and export ONNX
 % -------------------------------------------------------------------------
-save('C:\Users\rohit\Documents\MATLAB Code\trainedMobileNetV2_combined.mat', ...
+save(fullfile(scriptDir, 'trainedMobileNetV2_combined.mat'), ...
      'trainedNet', 'trainInfo', 'classNames');
 fprintf('Model saved: trainedMobileNetV2_combined.mat\n');
 
 setenv('PATH', [getenv('PATH') ';C:\ProgramData\MATLAB\SupportPackages\R2024b\bin\win64']);
 addpath(genpath('C:\ProgramData\MATLAB\SupportPackages\R2024b\toolbox\nnet\supportpackages\onnx'));
-exportONNXNetwork(trainedNet, 'C:\Users\rohit\Documents\MATLAB Code\trainedMobileNetV2_combined.onnx');
+exportONNXNetwork(trainedNet, fullfile(scriptDir, 'trainedMobileNetV2_combined.onnx'));
 fprintf('ONNX exported: trainedMobileNetV2_combined.onnx\n');
