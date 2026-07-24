@@ -11,7 +11,7 @@ nx = length(x_image);
 dx2  = reshape(x_image, [1 nx 1]) - reshape(x_elements, [1 1 N]);
 dz2  = reshape(z_image, [nz 1  1]);
 dist = sqrt(dx2.^2 + dz2.^2);
-sample_idx = round((dist/c)*fs) + 1;
+sample_idx = round((2 * dist/c)*fs) + 1;
 sample_idx = max(1, min(size(rf,1), sample_idx));
 
 % Gather delayed signals [nz x nx x N]
