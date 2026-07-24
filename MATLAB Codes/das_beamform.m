@@ -11,6 +11,10 @@ function bmode = das_beamform(rf, x_elements, z_image, x_image, fs, c)
 %
 %  Output:
 %    bmode      - Beamformed output image [num_depth x num_lateral], double
+%
+%  Note: uses two-way (pulse-echo) travel time. The pulse travels from
+%  the element to the pixel and the echo travels back to the element,
+%  so the total path length is 2*dist, not dist.
 
 num_samples  = size(rf, 1);
 num_depth    = length(z_image);
@@ -26,7 +30,7 @@ for iz = 1:num_depth
             dx = x_image(ix) - x_elements(ie);
             dz = z_image(iz);
             dist       = sqrt(dx*dx + dz*dz);
-            sample_idx = round((dist / c) * fs) + 1;
+            sample_idx = round((2 * dist / c) * fs) + 1;
             if sample_idx >= 1 && sample_idx <= num_samples
                 pixel_sum = pixel_sum + rf(sample_idx, ie);
             end
