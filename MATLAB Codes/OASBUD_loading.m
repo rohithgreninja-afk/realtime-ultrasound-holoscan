@@ -45,10 +45,13 @@ load(filePath);
 whos
 
 %Defining acquistion parameters
-fs = 25e6;          % Sampling frequency: 25 MHz
-c  = 1540;          % Speed of sound in soft tissue (m/s)
-fc = 5e6;           % Centre frequency of the ultrasound pulse: 5 MHz
-pitch = 0.245e-3;   % Distance between adjacent transducer elements: 0.245 mm
+% Per the OASBUD paper (Piotrzkowska-Wroblewska et al.): Ultrasonix
+% SonixTouch with L14-5/38 linear array, 40 MHz sampling frequency,
+% 10 MHz transducer centre frequency, 0.30 mm element pitch.
+fs = 40e6;           % Sampling frequency: 40 MHz
+c  = 1540;           % Speed of sound in soft tissue (m/s)
+fc = 10e6;           % Centre frequency of the ultrasound pulse: 10 MHz
+pitch = 0.30e-3;     % Distance between adjacent transducer elements: 0.30 mm
 
 % Derived values
 lambda     = c / fc;               % Wavelength in metres
