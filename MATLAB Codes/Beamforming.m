@@ -8,9 +8,9 @@ if isempty(oasbudPath)
 end
 load(oasbudPath);
 
-fs    = 25e6;
+fs    = 40e6;
 c     = 1540;
-pitch = 0.245e-3;
+pitch = 0.30e-3;
 
 % Extract RF data for patient 1
 rf = data(1).rf1;
@@ -45,8 +45,8 @@ for iz = 1:length(z_image)
             dz = z_image(iz);
             dist = sqrt(dx^2 + dz^2);
 
-            % Convert distance to a sample index
-            sample_idx = round((dist / c) * fs) + 1;
+            % Convert distance to a sample index (two-way pulse-echo travel time)
+            sample_idx = round((2 * dist / c) * fs) + 1;
 
             % Add the signal value if within bounds
             if sample_idx >= 1 && sample_idx <= num_samples
