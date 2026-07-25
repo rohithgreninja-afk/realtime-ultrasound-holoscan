@@ -176,10 +176,32 @@ the real recorded data's analytic (Hilbert) signal.
 
 Per-stage latency (data load, beamforming, enhancement, save), isolated the same way as
 the OASBUD pipeline's benchmark so the CUDA speedup specific to beamforming can be seen
-rather than blended into a single per-frame number, is measured by
-`PlaneWave_Pipeline_Benchmark.py`.
+rather than blended into a single per-frame number, measured by
+`PlaneWave_Pipeline_Benchmark.py` across all 20 real CIRS040GSE frames, single broadside
+angle, GPU Coder CUDA beamforming backend:
 
-*Benchmark run pending -- numbers to be added once measured.*
+| Stage | Mean (ms) | Share |
+|---|---|---|
+| Data load | 387.74 | 93.2% |
+| Beamforming | 8.44 | 2.0% |
+| Enhancement | 11.79 | 2.8% |
+| Save | 8.05 | 1.9% |
+| **Total** | **416.11** | **100%** |
+
+Throughput: **2.4 fps** (mean)
+
+This result is worth reading carefully rather than at face value. Beamforming itself,
+the part CUDA actually accelerates, is 8.44 ms, essentially negligible, 2% of the frame.
+That specific part of this work succeeded completely: the GPU Coder CUDA kernel took
+beamforming from being the dominant cost to being nearly free. But data loading, reading
+the HDF5 file and applying the lens delay, angle delay, and channel 125 corrections, is
+387.74 ms, 93% of the total frame time, and CUDA was never going to touch that, since it
+only accelerates the beamforming math, not disk I/O or the preprocessing steps ahead of
+it. The overall 2.4 fps throughput reflects this bottleneck, not a limitation of the
+acceleration work itself. Optimising the data loading path (a faster HDF5 read pattern,
+or pre-applying the fixed corrections once per dataset rather than per frame) is a real,
+identified next step, not yet attempted, and would very likely improve overall
+throughput far more than any further beamforming optimisation could at this point.
 
 ---
 
