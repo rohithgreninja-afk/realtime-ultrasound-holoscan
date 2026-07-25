@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import holoscan
 from holoscan.core import Application
 from holoscan.conditions import CountCondition
+from holoscan.schedulers import GreedyScheduler
 
 from data_source_op import DataSourceOp
 from beamforming_op import BeamformingOp
@@ -41,8 +42,7 @@ class PlaneWavePipeline(Application):
         # Determine how many times DataSourceOp should run. Holoscan
         # operators loop compute() indefinitely by default; without an
         # explicit CountCondition the scheduler never learns the source
-        # is finite, and the app hangs after the last real frame instead
-        # of stopping.
+        # is finite.
         max_frames_env = os.environ.get("PLANEWAVE_MAX_FRAMES")
         if max_frames_env:
             frame_count = int(max_frames_env)
@@ -64,6 +64,14 @@ class PlaneWavePipeline(Application):
         self.add_flow(data_source, beamforming, {("rf_frame", "rf_frame"), ("meta", "meta")})
         self.add_flow(beamforming, enhancement, {("bmode", "bmode"), ("meta", "meta")})
         self.add_flow(enhancement, output, {("enhanced", "enhanced"), ("meta", "meta")})
+
+        # The default scheduler does not always detect "no operator will
+        # ever be ready again" as a reason to exit -- it can sit waiting
+        # indefinitely once the finite source is exhausted. Explicitly
+        # enabling stop_on_deadlock makes the scheduler exit as soon as
+        # nothing more can happen, instead of hanging after the last frame.
+        self.scheduler(GreedyScheduler(self, stop_on_deadlock=True,
+                                        stop_on_deadlock_timeout=2000))
 
 
 if __name__ == "__main__":
