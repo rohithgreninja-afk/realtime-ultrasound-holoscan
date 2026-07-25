@@ -1,7 +1,11 @@
 % FK_Migration_MultiAngle_Test.m
-% Verification test for fk_migration_planewave_multiangle.m against the
-% same known wire-target frame used to verify the broadside-only version,
-% comparing single-angle f-k, multi-angle f-k, and DAS side by side.
+% Verification test for fk_migration_planewave_multiangle.m against a
+% known wire-target frame, comparing 1 angle vs 15 angles USING THE SAME
+% FUNCTION both times, so internal FFT padding/scaling stays identical
+% between the two runs and the raw amplitude comparison is actually
+% valid (an earlier version of this test compared across two different
+% functions with different zero-padding, which invalidated the raw
+% amplitude numbers -- fixed here).
 
 clearvars; clc; close all;
 
@@ -71,23 +75,24 @@ angleIdx = unique(angleIdx);
 fprintf('Using %d angles: %.1f to %.1f degrees\n', ...
     numel(angleIdx), xmitAngles(angleIdx(1)), xmitAngles(angleIdx(end)));
 
-rfMultiAngle = USDATA(:, :, angleIdx);
+[~, broadsideIdx] = min(abs(xmitAngles));
+
+rfMultiAngle  = USDATA(:, :, angleIdx);
 anglesSelected = anglesRad(angleIdx);
 
-[~, broadsideIdx] = min(abs(xmitAngles));
-rfSingleAngle = USDATA(:, :, broadsideIdx);
+rfOneAngle    = USDATA(:, :, broadsideIdx);
+angleOne      = anglesRad(broadsideIdx);
 
 %% ---- Common axes ----
 x_elements = ((0:n_ele-1) - (n_ele-1)/2) * pitch;
 
-%% ---- Single-angle f-k (already verified) ----
-fprintf('Running single-angle f-k migration (verified)...\n');
+%% ---- Same function, 1 angle vs 15 angles: internal scaling now identical ----
+fprintf('Running fk_migration_planewave_multiangle with 1 angle...\n');
 tic;
-fk_single_raw = fk_migration_planewave(rfSingleAngle, fs, pitch, c);
+fk_1angle_raw = fk_migration_planewave_multiangle(rfOneAngle, fs, pitch, c, angleOne);
 fprintf('Done in %.2f s\n', toc);
 
-%% ---- Multi-angle f-k (this is the test) ----
-fprintf('Running multi-angle f-k migration, %d angles...\n', numel(angleIdx));
+fprintf('Running fk_migration_planewave_multiangle with %d angles...\n', numel(angleIdx));
 tic;
 fk_multi_raw = fk_migration_planewave_multiangle(rfMultiAngle, fs, pitch, c, anglesSelected);
 fprintf('Done in %.2f s\n', toc);
@@ -107,19 +112,19 @@ function [wire_peak, bg_std, cnr] = measure_contrast(raw, z_axis_mm, wire_depths
     cnr = mean(wire_peak) / bg_std;
 end
 
-z_axis_mm = ((0:size(fk_single_raw,1)-1) * c / (2*fs)) * 1000;
-wire_depths_mm = [5, 12, 20, 32];   % approximate depths of 4 visible wires, read off the earlier figure
+z_axis_mm = ((0:size(fk_1angle_raw,1)-1) * c / (2*fs)) * 1000;
+wire_depths_mm = [5, 12, 20, 32];   % approximate depths of 4 visible wires
 bg_depth_range_mm = [45, 60];       % empty region below the wires, above the edge artefact
 
-[peak_single, bg_single, cnr_single] = measure_contrast(fk_single_raw, z_axis_mm, wire_depths_mm, bg_depth_range_mm);
-[peak_multi,  bg_multi,  cnr_multi ] = measure_contrast(fk_multi_raw,  z_axis_mm, wire_depths_mm, bg_depth_range_mm);
+[peak_1, bg_1, cnr_1] = measure_contrast(fk_1angle_raw, z_axis_mm, wire_depths_mm, bg_depth_range_mm);
+[peak_n, bg_n, cnr_n] = measure_contrast(fk_multi_raw,  z_axis_mm, wire_depths_mm, bg_depth_range_mm);
 
-fprintf('\n=== Quantitative contrast comparison (raw envelope, pre-normalisation) ===\n');
-fprintf('%-25s %12s %12s\n', 'Metric', 'Single-angle', 'Multi-angle');
-fprintf('%-25s %12.1f %12.1f\n', 'Mean wire peak', mean(peak_single), mean(peak_multi));
-fprintf('%-25s %12.2f %12.2f\n', 'Background std dev', bg_single, bg_multi);
-fprintf('%-25s %12.2f %12.2f\n', 'Contrast-to-noise ratio', cnr_single, cnr_multi);
-fprintf('CNR improvement: %.1f%%\n', 100*(cnr_multi/cnr_single - 1));
+fprintf('\n=== Quantitative contrast comparison (same function, valid comparison) ===\n');
+fprintf('%-25s %12s %12s\n', 'Metric', '1 angle', sprintf('%d angles', numel(angleIdx)));
+fprintf('%-25s %12.4g %12.4g\n', 'Mean wire peak', mean(peak_1), mean(peak_n));
+fprintf('%-25s %12.4g %12.4g\n', 'Background std dev', bg_1, bg_n);
+fprintf('%-25s %12.4g %12.4g\n', 'Contrast-to-noise ratio', cnr_1, cnr_n);
+fprintf('CNR improvement: %.1f%%\n', 100*(cnr_n/cnr_1 - 1));
 
 %% ---- Post-processing for display ----
 function img = postprocess(raw)
@@ -132,20 +137,20 @@ function img = postprocess(raw)
     img = medfilt2(imgUint8, [3 3]);
 end
 
-fk_single_img = postprocess(fk_single_raw);
+fk_1angle_img = postprocess(fk_1angle_raw);
 fk_multi_img  = postprocess(fk_multi_raw);
 
-nt0 = size(fk_single_raw, 1);
+nt0 = size(fk_1angle_raw, 1);
 z_image = (0:nt0-1) * c / (2*fs);
 
 %% ---- Display side by side ----
 figure('Position', [50 50 1100 700]);
 
 subplot(1,2,1);
-imagesc(x_elements*1000, z_image*1000, fk_single_img);
+imagesc(x_elements*1000, z_image*1000, fk_1angle_img);
 colormap gray; colorbar;
 xlabel('Lateral (mm)'); ylabel('Depth (mm)');
-title('F-K Migration -- Single Angle (broadside)');
+title('F-K Migration -- 1 Angle (same function)');
 
 subplot(1,2,2);
 imagesc(x_elements*1000, z_image*1000, fk_multi_img);
@@ -153,8 +158,8 @@ colormap gray; colorbar;
 xlabel('Lateral (mm)'); ylabel('Depth (mm)');
 title(sprintf('F-K Migration -- %d Angles Compounded', numel(angleIdx)));
 
-sgtitle(sprintf('F-K Migration: Single vs Multi-Angle -- %s', ...
-    dataFiles(frameIdx).name), 'Interpreter', 'none');
+sgtitle(sprintf('F-K Migration: 1 Angle vs %d Angles (same function) -- %s', ...
+    numel(angleIdx), dataFiles(frameIdx).name), 'Interpreter', 'none');
 
 scriptDir = fileparts(mfilename('fullpath'));
 repoRoot = fileparts(scriptDir);
