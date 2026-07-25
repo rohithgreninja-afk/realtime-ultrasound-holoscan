@@ -45,12 +45,23 @@ class OutputOp(holoscan.core.Operator):
 
     def stop(self):
         if not self.frame_times:
+            print("\n=== Plane Wave Pipeline Summary ===")
+            print("No frames were processed.")
             return
-        arr = np.array(self.frame_times[1:])  # drop first (includes warmup/JIT)
-        if len(arr) == 0:
-            return
+
+        # Drop the first frame's timing (includes one-time warmup/JIT
+        # overhead) only when there are enough frames left to still say
+        # something meaningful. For a 1-2 frame smoke test, report the
+        # raw numbers instead of silently printing nothing.
+        if len(self.frame_times) > 2:
+            arr = np.array(self.frame_times[1:])
+            note = " (first frame excluded as warmup)"
+        else:
+            arr = np.array(self.frame_times)
+            note = ""
+
         print("\n=== Plane Wave Pipeline Summary ===")
         print(f"Frames processed: {len(self.frame_times)}")
-        print(f"Mean frame time:  {arr.mean():.1f} ms")
+        print(f"Mean frame time:  {arr.mean():.1f} ms{note}")
         print(f"Throughput:       {1000/arr.mean():.1f} fps (mean)")
         print(f"Results saved to: {self.output_dir}")
