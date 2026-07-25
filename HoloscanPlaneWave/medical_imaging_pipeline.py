@@ -21,11 +21,13 @@ Optional:
 """
 import sys
 import os
+import glob
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import holoscan
 from holoscan.core import Application
+from holoscan.conditions import CountCondition
 
 from data_source_op import DataSourceOp
 from beamforming_op import BeamformingOp
@@ -36,7 +38,25 @@ from output_op import OutputOp
 class PlaneWavePipeline(Application):
 
     def compose(self):
-        data_source = DataSourceOp(self, name="data_source")
+        # Determine how many times DataSourceOp should run. Holoscan
+        # operators loop compute() indefinitely by default; without an
+        # explicit CountCondition the scheduler never learns the source
+        # is finite, and the app hangs after the last real frame instead
+        # of stopping.
+        max_frames_env = os.environ.get("PLANEWAVE_MAX_FRAMES")
+        if max_frames_env:
+            frame_count = int(max_frames_env)
+        else:
+            data_root = os.environ.get("PLANEWAVE_DATA_PATH", "")
+            condition = os.environ.get("PLANEWAVE_CONDITION", "low_attenuation")
+            condition_dir = os.path.join(data_root, condition)
+            n_available = len(glob.glob(os.path.join(condition_dir, "USDATA_*.mat")))
+            frame_count = n_available if n_available > 0 else 20  # sane fallback
+
+        print(f"DataSourceOp will run for {frame_count} frame(s)")
+
+        data_source = DataSourceOp(self, CountCondition(self, count=frame_count),
+                                    name="data_source")
         beamforming = BeamformingOp(self, name="beamforming")
         enhancement = EnhancementOp(self, name="enhancement")
         output = OutputOp(self, name="output")
