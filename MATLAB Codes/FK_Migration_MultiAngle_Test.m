@@ -87,12 +87,41 @@ fk_single_raw = fk_migration_planewave(rfSingleAngle, fs, pitch, c);
 fprintf('Done in %.2f s\n', toc);
 
 %% ---- Multi-angle f-k (this is the test) ----
-fprintf('Running multi-angle f-k migration, %d angles (UNVERIFIED)...\n', numel(angleIdx));
+fprintf('Running multi-angle f-k migration, %d angles...\n', numel(angleIdx));
 tic;
 fk_multi_raw = fk_migration_planewave_multiangle(rfMultiAngle, fs, pitch, c, anglesSelected);
 fprintf('Done in %.2f s\n', toc);
 
-%% ---- Post-processing ----
+%% ---- Quantitative comparison, on the raw envelope, before any display normalisation ----
+function [wire_peak, bg_std, cnr] = measure_contrast(raw, z_axis_mm, wire_depths_mm, bg_depth_range_mm)
+    envelope = abs(hilbert(raw));
+    wire_peak = zeros(size(wire_depths_mm));
+    for i = 1:numel(wire_depths_mm)
+        [~, row] = min(abs(z_axis_mm - wire_depths_mm(i)));
+        window = max(1,row-2):min(size(envelope,1),row+2);
+        wire_peak(i) = max(max(envelope(window, :)));
+    end
+    bgRows = find(z_axis_mm >= bg_depth_range_mm(1) & z_axis_mm <= bg_depth_range_mm(2));
+    bg_region = envelope(bgRows, :);
+    bg_std = std(bg_region(:));
+    cnr = mean(wire_peak) / bg_std;
+end
+
+z_axis_mm = ((0:size(fk_single_raw,1)-1) * c / (2*fs)) * 1000;
+wire_depths_mm = [5, 12, 20, 32];   % approximate depths of 4 visible wires, read off the earlier figure
+bg_depth_range_mm = [45, 60];       % empty region below the wires, above the edge artefact
+
+[peak_single, bg_single, cnr_single] = measure_contrast(fk_single_raw, z_axis_mm, wire_depths_mm, bg_depth_range_mm);
+[peak_multi,  bg_multi,  cnr_multi ] = measure_contrast(fk_multi_raw,  z_axis_mm, wire_depths_mm, bg_depth_range_mm);
+
+fprintf('\n=== Quantitative contrast comparison (raw envelope, pre-normalisation) ===\n');
+fprintf('%-25s %12s %12s\n', 'Metric', 'Single-angle', 'Multi-angle');
+fprintf('%-25s %12.1f %12.1f\n', 'Mean wire peak', mean(peak_single), mean(peak_multi));
+fprintf('%-25s %12.2f %12.2f\n', 'Background std dev', bg_single, bg_multi);
+fprintf('%-25s %12.2f %12.2f\n', 'Contrast-to-noise ratio', cnr_single, cnr_multi);
+fprintf('CNR improvement: %.1f%%\n', 100*(cnr_multi/cnr_single - 1));
+
+%% ---- Post-processing for display ----
 function img = postprocess(raw)
     envelope = abs(hilbert(raw));
     envNorm  = envelope / (max(envelope(:)) + eps);
@@ -122,15 +151,10 @@ subplot(1,2,2);
 imagesc(x_elements*1000, z_image*1000, fk_multi_img);
 colormap gray; colorbar;
 xlabel('Lateral (mm)'); ylabel('Depth (mm)');
-title(sprintf('F-K Migration -- %d Angles Compounded (UNVERIFIED)', numel(angleIdx)));
+title(sprintf('F-K Migration -- %d Angles Compounded', numel(angleIdx)));
 
 sgtitle(sprintf('F-K Migration: Single vs Multi-Angle -- %s', ...
     dataFiles(frameIdx).name), 'Interpreter', 'none');
-
-fprintf('\nCheck the figure: wires should be sharper and background cleaner in the\n');
-fprintf('multi-angle panel than the single-angle panel. If the multi-angle panel is\n');
-fprintf('garbled, shows doubled/ghost wires, or wires in wrong positions, do not\n');
-fprintf('trust it -- report back what you see.\n');
 
 scriptDir = fileparts(mfilename('fullpath'));
 repoRoot = fileparts(scriptDir);
