@@ -29,13 +29,19 @@ InferenceOp         -- ONNX MobileNetV2 mega model via CUDAExecutionProvider
 OutputOp            -- record prediction, print summary, save results
 ```
 
+**Why two pipelines exist, in one sentence:** the toolbox and CUDA items in the review
+below could not be genuinely satisfied using OASBUD, since its RF data is not real
+per-element channel data, so a second pipeline (Pipeline 2, below) runs on a dataset
+that actually is. Full reasoning in [Dataset Strategy](#dataset-strategy-why-oasbud-and-the-plane-wave-phantom-dataset-serve-different-roles)
+immediately below.
+
 ---
 
 ## Dataset Strategy: Why OASBUD and the Plane-Wave Phantom Dataset Serve Different Roles
 
 This project deliberately uses two different raw ultrasound sources for two different
 purposes, rather than one dataset for everything. Both limitations below were confirmed
-experimentally, not assumed; see `Project_Documentation.docx`, Section 13.3, for the
+experimentally, not assumed; see `Project_Documentation_1.pdf`, Section 13.3, for the
 full test methodology and result figures.
 
 ### Why OASBUD is not used for GPU-accelerated delay-and-sum beamforming or the Phased Array System Toolbox
@@ -87,7 +93,7 @@ power-law compression, was accelerated by generating CUDA directly from MATLAB
 the live `BeamformingOp` through ctypes. This is distinct from `das_beamform.m` /
 `das_beamform.cu`, an earlier GPU Coder target implementing delay-and-sum beamforming:
 that method is not used for OASBUD, since OASBUD's RF columns are pre-formed scan lines
-rather than raw per-element channel data (see Project_Documentation.docx, Section 5.2),
+rather than raw per-element channel data (see Project_Documentation_1.pdf, Section 5.2),
 so accelerating it would not have helped the deployed pipeline. `aline_reconstruct.m`
 instead implements the exact Hilbert/power-law method OASBUD actually needs.
 
@@ -122,6 +128,26 @@ the pipeline above beyond the choice of median filter for speckle reduction, and
 has no classification stage: the dataset behind it (CIRS040GSE, a physical calibration
 phantom, see [Dataset Strategy](#dataset-strategy-why-oasbud-and-the-plane-wave-phantom-dataset-serve-different-roles)
 above) has no disease labels to classify.
+
+```
+CIRS040GSE plane wave RF data [6]
+     |
+     v
+DataSourceOp        -- loads HDF5 frame, applies lens delay + angle delay +
+                        channel 125 corrections (real per-element channel data)
+     |
+     v
+BeamformingOp       -- plane-wave delay-and-sum, single broadside angle
+                        GPU Coder CUDA kernel if available, numpy fallback otherwise
+     |
+     v
+EnhancementOp       -- envelope detection -> log compression -> median filter 3x3
+                        (viewable B-mode image, not a classifier input tile)
+     |
+     v
+OutputOp            -- save reconstructed frame, print timing
+                        (no classification stage -- this dataset has no diagnostic labels)
+```
 
 ### Why the physics is different here
 
@@ -345,7 +371,7 @@ realtime-ultrasound-holoscan/
 │
 ├── Project Figures/                Figures from Phases 3-6 and the Simulink diagram
 │
-├── Project_Documentation.docx      Complete project report (background, methodology, results, references)
+├── Project_Documentation_1.pdf      Complete project report (background, methodology, results, references)
 │
 ├── .gitignore
 └── README.md
@@ -417,7 +443,7 @@ python3 aline_cuda_verify.py
 
 A clean `PASS`, differences on the order of `1e-13` across all 100 patients, confirms the
 library is safe to use. Full technical detail (why each of these steps is needed, and the
-complete before/after benchmark) is in `Project_Documentation.docx`, Section 9 and Appendix 13.4.
+complete before/after benchmark) is in `Project_Documentation_1.pdf`, Section 9 and Appendix 13.4.
 
 ### Holoscan (WSL2)
 
@@ -502,7 +528,7 @@ correctly. Results are also saved to `Holoscan/pipeline_results.npy`.
 
 **DAS beamforming (das_beamform.m and related files):**
 - Uses two-way (pulse-echo) travel time: `sample_idx = round((2*dist/c)*fs) + 1`.
-- Not used for OASBUD reconstruction under any circumstances, correct physics or not, since OASBUD's RF columns are pre-formed scan lines rather than raw per-element data. See Project_Documentation.docx Section 5.2.
+- Not used for OASBUD reconstruction under any circumstances, correct physics or not, since OASBUD's RF columns are pre-formed scan lines rather than raw per-element data. See Project_Documentation_1.pdf Section 5.2.
 
 ---
 
