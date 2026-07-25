@@ -70,9 +70,15 @@ for k = 1:n_frames
     % ERM velocity for this steering angle
     v = c / sqrt(1 + cosA + sinA^2);
 
-    % Steering-angle time compensation, applied before the spatial FFT
+    % Steering-angle time compensation, applied before the spatial FFT.
+    % The (nx0-1)*(angle<0) offset matters: for a negative steering angle
+    % the LAST element fires first instead of the first, so the delay
+    % reference anchor flips to the other end of the array. Omitting this
+    % term silently misaligns every negative-angle frame before
+    % compounding, which cancels signal instead of reinforcing it.
     if sinA ~= 0
-        dt = sinA * (-(0:nx0-1)) * pitch / c;
+        offset = (nx0 - 1) * (tx_angles(k) < 0);
+        dt = sinA * (offset - (0:nx0-1)) * pitch / c;
         frameK = frameK .* exp(-2i*pi * f0 .* dt);
     end
 
