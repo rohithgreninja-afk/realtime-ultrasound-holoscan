@@ -10,10 +10,20 @@ It carries no malignancy labels -- see README Dataset Strategy section --
 so this pipeline never emits a classification label, only reconstructed
 images.
 
-Expected folder layout (matches the dataset as published):
+Expected folder layout, confirmed against the real download:
   <PLANEWAVE_DATA_PATH>/
-      USHEADER_<timestamp>.mat       -- transducer + acquisition metadata
-      **/USDATA_*.mat                -- one file per recorded frame (HDF5/v7.3 .mat)
+      USHEADER_<timestamp>.mat        -- transducer + acquisition metadata,
+                                          one per attenuation condition
+      low_attenuation/USDATA_*.mat    -- 20 frames (5 each: hypoechoic,
+                                          wires, +3/+6dB, -3/-6dB)
+      high_attenuation/USDATA_*.mat   -- same 20, different attenuation
+
+USDATA is int16, and MATLAB reports its shape as
+[time_samples, elements, 1, angles] -- a singleton dimension that gets
+dropped here. h5py often returns v7.3 .mat arrays with dimensions in
+reversed order compared to MATLAB's own size() output, so rather than
+hardcode a transpose, axes are identified by matching their length
+against known values from the header (element count, angle count).
 """
 import os
 import glob
@@ -33,14 +43,27 @@ class DataSourceOp(holoscan.core.Operator):
         data_root = os.environ.get("PLANEWAVE_DATA_PATH")
         if not data_root:
             raise RuntimeError(
-                "PLANEWAVE_DATA_PATH not set. Point it at the unzipped "
-                "CIRS040GSE (or CIRS073_RUMC) folder, e.g.:\n"
-                "  export PLANEWAVE_DATA_PATH=/path/to/CIRS040GSE"
+                "PLANEWAVE_DATA_PATH not set. Point it at the folder containing "
+                "USHEADER_*.mat and the low_attenuation/high_attenuation "
+                "subfolders, e.g.:\n"
+                "  export PLANEWAVE_DATA_PATH=/path/to/CIRS040GSE/CIRS040GSE"
             )
 
-        header_files = glob.glob(os.path.join(data_root, "USHEADER_*.mat"))
+        condition = os.environ.get("PLANEWAVE_CONDITION", "low_attenuation")
+        condition_dir = os.path.join(data_root, condition)
+        if not os.path.isdir(condition_dir):
+            raise RuntimeError(
+                f"{condition_dir} not found. Set PLANEWAVE_CONDITION to "
+                f"'low_attenuation' or 'high_attenuation'."
+            )
+
+        # The header lives inside each attenuation folder
+        header_files = glob.glob(os.path.join(condition_dir, "USHEADER_*.mat"))
         if not header_files:
-            raise RuntimeError(f"No USHEADER_*.mat file found under {data_root}")
+            # fall back to a header at the parent level, in case the layout differs
+            header_files = glob.glob(os.path.join(data_root, "USHEADER_*.mat"))
+        if not header_files:
+            raise RuntimeError(f"No USHEADER_*.mat file found under {condition_dir} or {data_root}")
         header_file = header_files[0]
 
         usheader = loadmat(header_file, struct_as_record=False)["USHEADER"][0][0]
@@ -52,14 +75,14 @@ class DataSourceOp(holoscan.core.Operator):
         self.c = float(np.squeeze(usheader.c))
         self.lens_delay = 96  # fixed acoustic lens correction, per dataset documentation
 
-        print(f"Plane wave header loaded: {self.n_ang} angles, {self.n_ele} elements, "
-              f"fs={self.fs/1e6:.2f} MHz, pitch={self.pitch*1000:.3f} mm, c={self.c:.0f} m/s")
+        print(f"Plane wave header loaded ({condition}): {self.n_ang} angles, "
+              f"{self.n_ele} elements, fs={self.fs/1e6:.2f} MHz, "
+              f"pitch={self.pitch*1000:.3f} mm, c={self.c:.0f} m/s")
 
-        self.data_files = sorted(glob.glob(
-            os.path.join(data_root, "**", "USDATA_*.mat"), recursive=True))
+        self.data_files = sorted(glob.glob(os.path.join(condition_dir, "USDATA_*.mat")))
         if not self.data_files:
-            raise RuntimeError(f"No USDATA_*.mat files found under {data_root}")
-        print(f"Found {len(self.data_files)} frame(s)")
+            raise RuntimeError(f"No USDATA_*.mat files found under {condition_dir}")
+        print(f"Found {len(self.data_files)} frame(s) in {condition}")
 
         self.frame_idx = 0
         self.max_frames = int(os.environ.get("PLANEWAVE_MAX_FRAMES", len(self.data_files)))
@@ -70,10 +93,33 @@ class DataSourceOp(holoscan.core.Operator):
         delay_sec = np.abs((self.n_ele - 1) / 2 * self.pitch * np.sin(angles_rad) / self.c)
         self.delay_samples = np.floor(delay_sec * self.fs).astype(int)
 
+    def _reorder_to_time_elements_angles(self, raw):
+        """raw is USDATA after dropping the singleton dim -- 3 axes, order
+        uncertain (h5py vs MATLAB convention). Identify elements and angles
+        axes by matching their length against known header values; whatever
+        remains is time samples."""
+        shape = raw.shape
+        ele_axis = next((i for i, s in enumerate(shape) if s == self.n_ele), None)
+        ang_axis = next((i for i, s in enumerate(shape)
+                          if s == self.n_ang and i != ele_axis), None)
+        if ele_axis is None or ang_axis is None:
+            raise ValueError(
+                f"Could not identify element/angle axes in USDATA shape {shape} "
+                f"against header n_ele={self.n_ele}, n_ang={self.n_ang}. "
+                f"Print the raw shape and check against the header manually."
+            )
+        time_axis = next(i for i in range(3) if i not in (ele_axis, ang_axis))
+        return np.transpose(raw, (time_axis, ele_axis, ang_axis))
+
     def _load_frame(self, path):
         with h5py.File(path, "r") as f:
-            usdata = np.swapaxes(np.squeeze(np.array(f.get("USDATA"))), 0, 2).astype(np.float64)
-        # usdata shape: [time_samples, elements, angles]
+            raw = np.array(f.get("USDATA"))
+        raw = np.squeeze(raw)  # drop the singleton dimension
+        if raw.ndim != 3:
+            raise ValueError(f"Expected 3 dims after squeeze, got shape {raw.shape} for {path}")
+
+        usdata = self._reorder_to_time_elements_angles(raw).astype(np.float64)
+        # usdata shape is now: [time_samples, elements, angles]
 
         # Lens delay correction
         usdata = usdata[self.lens_delay:, :, :]
@@ -81,7 +127,7 @@ class DataSourceOp(holoscan.core.Operator):
         # Angle-dependent delay correction
         n_t = usdata.shape[0]
         for i_ang in range(usdata.shape[2]):
-            d = self.delay_samples[i_ang] if self.n_ang > 1 else self.delay_samples
+            d = self.delay_samples[i_ang] if self.n_ang > 1 else int(self.delay_samples)
             if d > 0:
                 usdata[: n_t - d, :, i_ang] = usdata[d:, :, i_ang]
                 usdata[n_t - d :, :, i_ang] = 0
