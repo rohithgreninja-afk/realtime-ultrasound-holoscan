@@ -15,11 +15,11 @@ function bmode_raw = fk_migration_planewave(rf, fs, pitch, c)
 %   this project's own variable names and structure, not a copy of that
 %   repository's source.
 %
-%   NOT YET NUMERICALLY VERIFIED. Run FK_Migration_Test.m against a known
-%   wire-target frame and confirm the wires resolve to sharp points
-%   before trusting this anywhere in the live pipeline -- the same
-%   validation discipline already applied to the DAS delay law and the
-%   data loader in this project.
+%   Verified 2026-07-25 against a real wire-target frame from CIRS040GSE
+%   (FK_Migration_Test.m): wires resolve to sharp discrete points at the
+%   same positions as the already-verified DAS reconstruction, with a
+%   visibly cleaner noise floor than DAS, consistent with f-k migration's
+%   known image quality advantage over delay-and-sum.
 %
 %   Inputs:
 %     rf    - RF data [num_samples x num_elements], single broadside (0 deg) acquisition
