@@ -1,11 +1,11 @@
 % FK_Migration_MultiAngle_Test.m
 % Verification test for fk_migration_planewave_multiangle.m against a
-% known wire-target frame, comparing 1 angle vs 15 angles USING THE SAME
-% FUNCTION both times, so internal FFT padding/scaling stays identical
-% between the two runs and the raw amplitude comparison is actually
-% valid (an earlier version of this test compared across two different
-% functions with different zero-padding, which invalidated the raw
-% amplitude numbers -- fixed here).
+% known wire-target frame, comparing 1 angle vs the FULL 75 angles USING
+% THE SAME FUNCTION both times, so internal FFT padding/scaling stays
+% identical between the two runs and the raw amplitude comparison is
+% actually valid. Display is cropped before the known FFT boundary
+% artefact near the maximum depth, since nothing meaningful sits past
+% the wires anyway.
 
 clearvars; clc; close all;
 
@@ -17,7 +17,8 @@ if isempty(dataRoot)
 end
 condition = 'low_attenuation';
 frameIdx  = 6;   % readme.txt: frames 6-10 are wire targets
-N_ANGLES_TO_USE = 15;  % subsample from the 75 available for reasonable runtime
+N_ANGLES_TO_USE = 75;   % full angle range, not a subsample this time
+MAX_DISPLAY_DEPTH_MM = 45;  % crop before the FFT boundary artefact near max depth
 
 conditionDir = fullfile(dataRoot, condition);
 
@@ -69,8 +70,8 @@ if n_ele > 126
     USDATA(:, 126, :) = 2 * USDATA(:, 126, :);
 end
 
-%% ---- Select subsampled angle indices, spread across the full range ----
-angleIdx = round(linspace(1, n_ang, N_ANGLES_TO_USE));
+%% ---- Select angle indices ----
+angleIdx = round(linspace(1, n_ang, min(N_ANGLES_TO_USE, n_ang)));
 angleIdx = unique(angleIdx);
 fprintf('Using %d angles: %.1f to %.1f degrees\n', ...
     numel(angleIdx), xmitAngles(angleIdx(1)), xmitAngles(angleIdx(end)));
@@ -86,13 +87,13 @@ angleOne      = anglesRad(broadsideIdx);
 %% ---- Common axes ----
 x_elements = ((0:n_ele-1) - (n_ele-1)/2) * pitch;
 
-%% ---- Same function, 1 angle vs 15 angles: internal scaling now identical ----
+%% ---- Same function, 1 angle vs full angle set: internal scaling now identical ----
 fprintf('Running fk_migration_planewave_multiangle with 1 angle...\n');
 tic;
 fk_1angle_raw = fk_migration_planewave_multiangle(rfOneAngle, fs, pitch, c, angleOne);
 fprintf('Done in %.2f s\n', toc);
 
-fprintf('Running fk_migration_planewave_multiangle with %d angles...\n', numel(angleIdx));
+fprintf('Running fk_migration_planewave_multiangle with %d angles (this will take longer)...\n', numel(angleIdx));
 tic;
 fk_multi_raw = fk_migration_planewave_multiangle(rfMultiAngle, fs, pitch, c, anglesSelected);
 fprintf('Done in %.2f s\n', toc);
@@ -113,8 +114,8 @@ function [wire_peak, bg_std, cnr] = measure_contrast(raw, z_axis_mm, wire_depths
 end
 
 z_axis_mm = ((0:size(fk_1angle_raw,1)-1) * c / (2*fs)) * 1000;
-wire_depths_mm = [5, 12, 20, 32];   % approximate depths of 4 visible wires
-bg_depth_range_mm = [45, 60];       % empty region below the wires, above the edge artefact
+wire_depths_mm = [5, 12, 20, 32];
+bg_depth_range_mm = [35, MAX_DISPLAY_DEPTH_MM];
 
 [peak_1, bg_1, cnr_1] = measure_contrast(fk_1angle_raw, z_axis_mm, wire_depths_mm, bg_depth_range_mm);
 [peak_n, bg_n, cnr_n] = measure_contrast(fk_multi_raw,  z_axis_mm, wire_depths_mm, bg_depth_range_mm);
@@ -126,9 +127,10 @@ fprintf('%-25s %12.4g %12.4g\n', 'Background std dev', bg_1, bg_n);
 fprintf('%-25s %12.4g %12.4g\n', 'Contrast-to-noise ratio', cnr_1, cnr_n);
 fprintf('CNR improvement: %.1f%%\n', 100*(cnr_n/cnr_1 - 1));
 
-%% ---- Post-processing for display ----
-function img = postprocess(raw)
-    envelope = abs(hilbert(raw));
+%% ---- Post-processing for display, cropped before the boundary artefact ----
+function img = postprocess(raw, z_axis_mm, max_depth_mm)
+    cropRows = z_axis_mm <= max_depth_mm;
+    envelope = abs(hilbert(raw(cropRows, :)));
     envNorm  = envelope / (max(envelope(:)) + eps);
     db = 20*log10(envNorm + 1e-6);
     db = max(db, -60);
@@ -137,28 +139,27 @@ function img = postprocess(raw)
     img = medfilt2(imgUint8, [3 3]);
 end
 
-fk_1angle_img = postprocess(fk_1angle_raw);
-fk_multi_img  = postprocess(fk_multi_raw);
+fk_1angle_img = postprocess(fk_1angle_raw, z_axis_mm, MAX_DISPLAY_DEPTH_MM);
+fk_multi_img  = postprocess(fk_multi_raw,  z_axis_mm, MAX_DISPLAY_DEPTH_MM);
 
-nt0 = size(fk_1angle_raw, 1);
-z_image = (0:nt0-1) * c / (2*fs);
+z_image_cropped = z_axis_mm(z_axis_mm <= MAX_DISPLAY_DEPTH_MM);
 
 %% ---- Display side by side ----
 figure('Position', [50 50 1100 700]);
 
 subplot(1,2,1);
-imagesc(x_elements*1000, z_image*1000, fk_1angle_img);
+imagesc(x_elements*1000, z_image_cropped, fk_1angle_img);
 colormap gray; colorbar;
 xlabel('Lateral (mm)'); ylabel('Depth (mm)');
-title('F-K Migration -- 1 Angle (same function)');
+title('F-K Migration -- 1 Angle');
 
 subplot(1,2,2);
-imagesc(x_elements*1000, z_image*1000, fk_multi_img);
+imagesc(x_elements*1000, z_image_cropped, fk_multi_img);
 colormap gray; colorbar;
 xlabel('Lateral (mm)'); ylabel('Depth (mm)');
 title(sprintf('F-K Migration -- %d Angles Compounded', numel(angleIdx)));
 
-sgtitle(sprintf('F-K Migration: 1 Angle vs %d Angles (same function) -- %s', ...
+sgtitle(sprintf('F-K Migration: 1 Angle vs %d Angles, Full Range -- %s', ...
     numel(angleIdx), dataFiles(frameIdx).name), 'Interpreter', 'none');
 
 scriptDir = fileparts(mfilename('fullpath'));
