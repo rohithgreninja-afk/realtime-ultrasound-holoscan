@@ -44,7 +44,7 @@ found, so they'll still run, just without acceleration.
 
 ```bash
 cd ~/realtime-ultrasound-holoscan/Holoscan
-export OASBUD_PATH="/mnt/c/Users/rohit/Downloads/Real Time Image Processing Project/OASBUD.mat"
+export OASBUD_PATH="/path/to/OASBUD.mat"
 python3 medical_imaging_pipeline.py 100
 python3 Phase6_Pipeline_Benchmark.py
 ```
@@ -57,7 +57,7 @@ is genuinely active.
 
 ```bash
 cd ~/realtime-ultrasound-holoscan/HoloscanPlaneWave
-export PLANEWAVE_DATA_PATH="/mnt/c/Users/rohit/Downloads/CIRS040GSE/CIRS040GSE"
+export PLANEWAVE_DATA_PATH="/path/to/CIRS040GSE"
 python3 medical_imaging_pipeline.py 20
 python3 PlaneWave_Pipeline_Benchmark.py
 ```
