@@ -29,13 +29,19 @@ InferenceOp         -- ONNX MobileNetV2 mega model via CUDAExecutionProvider
 OutputOp            -- record prediction, print summary, save results
 ```
 
+**Why two pipelines exist, in one sentence:** the toolbox and CUDA items in the review
+below could not be genuinely satisfied using OASBUD, since its RF data is not real
+per-element channel data, so a second pipeline (Pipeline 2, below) runs on a dataset
+that actually is. Full reasoning in [Dataset Strategy](#dataset-strategy-why-oasbud-and-the-plane-wave-phantom-dataset-serve-different-roles)
+immediately below.
+
 ---
 
 ## Dataset Strategy: Why OASBUD and the Plane-Wave Phantom Dataset Serve Different Roles
 
 This project deliberately uses two different raw ultrasound sources for two different
 purposes, rather than one dataset for everything. Both limitations below were confirmed
-experimentally, not assumed; see `Project_Documentation.docx`, Section 13.3, for the
+experimentally, not assumed; see `Project_Documentation_1.pdf`, Section 13.3, for the
 full test methodology and result figures.
 
 ### Why OASBUD is not used for GPU-accelerated delay-and-sum beamforming or the Phased Array System Toolbox
@@ -71,7 +77,7 @@ malignant/benign/normal classification accuracy.
 | | OASBUD | Plane-wave phantom dataset [6] |
 |---|---|---|
 | Data type | Pre-formed scan lines | Raw per-element channel data |
-| Used for | AI classification (malignant/benign), via GPU Coder-accelerated per-column Hilbert | Delay-and-sum GPU Coder CUDA + Phased Array System Toolbox demonstration (planned) |
+| Used for | AI classification (malignant/benign), via GPU Coder-accelerated per-column Hilbert | Delay-and-sum GPU Coder CUDA + Phased Array System Toolbox demonstration, real-time acceleration only (see Pipeline 2 below) |
 | Not used for | Delay-and-sum beamforming, Phased Array System Toolbox | Any classification accuracy claim (no disease labels exist) |
 
 The two datasets are not interchangeable in either direction, and this project does not
@@ -87,7 +93,7 @@ power-law compression, was accelerated by generating CUDA directly from MATLAB
 the live `BeamformingOp` through ctypes. This is distinct from `das_beamform.m` /
 `das_beamform.cu`, an earlier GPU Coder target implementing delay-and-sum beamforming:
 that method is not used for OASBUD, since OASBUD's RF columns are pre-formed scan lines
-rather than raw per-element channel data (see Project_Documentation.docx, Section 5.2),
+rather than raw per-element channel data (see Project_Documentation_1.pdf, Section 5.2),
 so accelerating it would not have helped the deployed pipeline. `aline_reconstruct.m`
 instead implements the exact Hilbert/power-law method OASBUD actually needs.
 
@@ -111,6 +117,117 @@ Beamforming latency fell 45%, total pipeline latency fell 41%, and classificatio
 accuracy is unchanged, as expected given the sub-1e-12 numerical agreement between the
 two implementations: this accelerated the pipeline without altering a single
 classification outcome.
+
+---
+
+## Pipeline 2: Plane Wave Beamforming (Real-Time Acceleration Demonstration)
+
+A second, completely separate Holoscan application, `HoloscanPlaneWave/`, runs
+genuine raw per-element channel data instead of OASBUD. It shares no operators with
+the pipeline above beyond the choice of median filter for speckle reduction, and it
+has no classification stage: the dataset behind it (CIRS040GSE, a physical calibration
+phantom, see [Dataset Strategy](#dataset-strategy-why-oasbud-and-the-plane-wave-phantom-dataset-serve-different-roles)
+above) has no disease labels to classify.
+
+```
+CIRS040GSE plane wave RF data [6]
+     |
+     v
+DataSourceOp        -- loads HDF5 frame, applies lens delay + angle delay +
+                        channel 125 corrections (real per-element channel data)
+     |
+     v
+BeamformingOp       -- plane-wave delay-and-sum, single broadside angle
+                        GPU Coder CUDA kernel if available, numpy fallback otherwise
+     |
+     v
+EnhancementOp       -- envelope detection -> log compression -> median filter 3x3
+                        (viewable B-mode image, not a classifier input tile)
+     |
+     v
+OutputOp            -- save reconstructed frame, print timing
+                        (no classification stage -- this dataset has no diagnostic labels)
+```
+
+### Why the physics is different here
+
+OASBUD's DAS-family comparison methods assume classical per-element pulse-echo: each
+element fires and receives independently, so delay is simply twice the element-to-pixel
+distance over the speed of sound. Plane wave imaging is physically different, all
+elements fire together to form a flat wavefront, so the transmit delay follows the
+wavefront's arrival angle and time rather than distance from any single element; only
+the receive half still uses the familiar per-element spherical delay. This required a
+new function, `das_beamform_planewave.m`, distinct from `das_beamform.m`.
+
+### GPU Coder CUDA acceleration
+
+Same build process already proven for the OASBUD pipeline's `aline_reconstruct.m`
+target: variable-size code generation (element count and sample count both vary by
+acquisition), a Linux shared library build in WSL2 reusing the same toolchain fixes
+already resolved for the OASBUD pipeline (GCC version pin, the glibc/CUDA header patch,
+cuFFT linking), an `extern "C"` wrapper for the ctypes binding, and numerical
+verification before deployment: the CUDA output matched a numpy reference
+implementation with **zero difference** (exact bit-for-bit match) across 5 real frames,
+tested at the broadside steering angle, and the pipeline falls back to numpy
+automatically if the compiled library isn't present.
+
+### Two reconstruction methods, one live, one for comparison
+
+**Delay-and-sum (`das_beamform_planewave.m`)** is the live, GPU Coder-accelerated
+method used in the deployed pipeline.
+
+**F-k migration (`fk_migration_planewave.m`, `fk_migration_planewave_multiangle.m`)**
+is documented as a comparison method, the same role DMAS and MVBF play for OASBUD in
+Section 6, not wired into the live real-time pipeline. This is the reconstruction
+method the dataset's own original authors use as their reference implementation
+(Garcia D et al., "Stolt's f-k migration for plane wave ultrasound imaging," IEEE Trans
+Ultrason Ferroelectr Freq Control, 2013;60:1853-1867), reimplemented independently with
+attribution rather than copied from the reference source. Both a broadside-only version
+and a full multi-angle version (arbitrary steering angles, running-average compounding)
+were built and verified against a real wire-target frame: wires resolve to sharp,
+correctly-positioned points, and compounding across all 75 available angles improved
+measured contrast-to-noise ratio by 56% versus a single angle (background noise
+standard deviation dropped ~40%), measured directly on the raw envelope rather than by
+visual inspection of independently-normalised display images.
+
+### Phased Array System Toolbox, on real data
+
+`Phase7_PhasedArrayToolbox_RealData.m` replaces the earlier synthetic point-target
+demonstration with genuine recorded channel data from a CIRS040GSE wire-target frame,
+using `phased.ULA` with the array's real geometry (128 elements, pitch read directly
+from the dataset header) and `phased.PhaseShiftBeamformer` steered toward broadside on
+the real recorded data's analytic (Hilbert) signal.
+
+### Pipeline benchmark
+
+Per-stage latency (data load, beamforming, enhancement, save), isolated the same way as
+the OASBUD pipeline's benchmark so the CUDA speedup specific to beamforming can be seen
+rather than blended into a single per-frame number, measured by
+`PlaneWave_Pipeline_Benchmark.py` across all 20 real CIRS040GSE frames, single broadside
+angle, GPU Coder CUDA beamforming backend:
+
+| Stage | Mean (ms) | Share |
+|---|---|---|
+| Data load | 387.74 | 93.2% |
+| Beamforming | 8.44 | 2.0% |
+| Enhancement | 11.79 | 2.8% |
+| Save | 8.05 | 1.9% |
+| **Total** | **416.11** | **100%** |
+
+Throughput: **2.4 fps** (mean)
+
+This result is worth reading carefully rather than at face value. Beamforming itself,
+the part CUDA actually accelerates, is 8.44 ms, essentially negligible, 2% of the frame.
+That specific part of this work succeeded completely: the GPU Coder CUDA kernel took
+beamforming from being the dominant cost to being nearly free. But data loading, reading
+the HDF5 file and applying the lens delay, angle delay, and channel 125 corrections, is
+387.74 ms, 93% of the total frame time, and CUDA was never going to touch that, since it
+only accelerates the beamforming math, not disk I/O or the preprocessing steps ahead of
+it. The overall 2.4 fps throughput reflects this bottleneck, not a limitation of the
+acceleration work itself. Optimising the data loading path (a faster HDF5 read pattern,
+or pre-applying the fixed corrections once per dataset rather than per frame) is a real,
+identified next step, not yet attempted, and would very likely improve overall
+throughput far more than any further beamforming optimisation could at this point.
 
 ---
 
@@ -201,10 +318,19 @@ realtime-ultrasound-holoscan/
 │   ├── run_codegen.m               GPU Coder script -> generates das_beamform CUDA lib
 │   ├── aline_reconstruct.m         Per-column Hilbert + power-law GPU Coder entry point (the method actually used for OASBUD)
 │   ├── aline_run_codegen.m         GPU Coder script -> generates aline_reconstruct CUDA lib
+│   ├── das_beamform_planewave.m    Plane-wave DAS entry point (Pipeline 2, live/accelerated method)
+│   ├── das_run_codegen_planewave.m GPU Coder script -> generates das_beamform_planewave CUDA lib
+│   ├── fk_migration_planewave.m           F-k migration, broadside only (Pipeline 2, comparison method)
+│   ├── fk_migration_planewave_multiangle.m F-k migration, arbitrary angles + compounding (Pipeline 2, comparison method)
+│   ├── PlaneWave_Reconstruct_Test.m       First-reconstruction DAS test against real data
+│   ├── FK_Migration_Test.m                F-k migration verification (broadside) against real wire target
+│   ├── FK_Migration_MultiAngle_Test.m     F-k migration verification (multi-angle) with quantitative CNR measurement
+│   ├── Phase7_PhasedArrayToolbox_Demo.m       Phased Array System Toolbox, synthetic data (superseded, kept for reference)
+│   ├── Phase7_PhasedArrayToolbox_RealData.m   Phased Array System Toolbox, real CIRS040GSE channel data
 │   ├── Phase3_Enhancement.m        Enhancement filter comparison
 │   ├── Phase4_MegaTrain.m          Mega model training (all 5 datasets)
 │   ├── Phase6_CNN_Evaluation.m     Comprehensive Phase 6 evaluation
-│   ├── codegen/                    Generated CUDA source (das_beamform.cu, aline_reconstruct.cu and supporting files)
+│   ├── codegen/                    Generated CUDA source (das_beamform.cu, aline_reconstruct.cu, das_beamform_planewave.cu and supporting files)
 │   ├── trainedMobileNetV2_mega.mat Trained network weights
 │   └── trainedMobileNetV2_mega.onnx ONNX export for Python inference
 │
@@ -221,6 +347,17 @@ realtime-ultrasound-holoscan/
 │   ├── Phase6_Pipeline_Benchmark.py Standalone timing benchmark (uses the CUDA path automatically when available)
 │   └── requirements.txt            Python dependencies for the Holoscan pipeline
 │
+├── HoloscanPlaneWave/               Pipeline 2 -- completely separate app, real per-element data, no classification stage
+│   ├── medical_imaging_pipeline.py Main Holoscan application -- entry point
+│   ├── data_source_op.py           Loads CIRS040GSE/CIRS073_RUMC, applies lens delay/angle delay/channel 125 corrections
+│   ├── beamforming_op.py           Plane-wave DAS, CUDA path via das_cuda_planewave.py with numpy fallback
+│   ├── das_cuda_planewave.py       ctypes binding to the GPU Coder-generated das_beamform_planewave CUDA library
+│   ├── das_beamform_planewave_c_wrapper.cpp  extern "C" wrapper
+│   ├── das_cuda_planewave_verify.py Correctness check: CUDA output vs numpy reference on real data
+│   ├── enhancement_op.py           Envelope detection + log compression + median filter (viewable B-mode, not a classifier tile)
+│   ├── output_op.py                Saves reconstructed frames, no classification output
+│   └── PlaneWave_Pipeline_Benchmark.py Per-stage timing benchmark
+│
 ├── Simulink/
 │   ├── UltrasoundPipelineDiagram.slx        Five-stage architecture diagram (visual reference)
 │   └── UltrasoundEnhancementSubsystem.slx   Functional model -- envelope detection + median filter simulated in MATLAB R2024b
@@ -234,7 +371,7 @@ realtime-ultrasound-holoscan/
 │
 ├── Project Figures/                Figures from Phases 3-6 and the Simulink diagram
 │
-├── Project_Documentation.docx      Complete project report (background, methodology, results, references)
+├── Project_Documentation_1.pdf      Complete project report (background, methodology, results, references)
 │
 ├── .gitignore
 └── README.md
@@ -306,7 +443,7 @@ python3 aline_cuda_verify.py
 
 A clean `PASS`, differences on the order of `1e-13` across all 100 patients, confirms the
 library is safe to use. Full technical detail (why each of these steps is needed, and the
-complete before/after benchmark) is in `Project_Documentation.docx`, Section 9 and Appendix 13.4.
+complete before/after benchmark) is in `Project_Documentation_1.pdf`, Section 9 and Appendix 13.4.
 
 ### Holoscan (WSL2)
 
@@ -391,7 +528,7 @@ correctly. Results are also saved to `Holoscan/pipeline_results.npy`.
 
 **DAS beamforming (das_beamform.m and related files):**
 - Uses two-way (pulse-echo) travel time: `sample_idx = round((2*dist/c)*fs) + 1`.
-- Not used for OASBUD reconstruction under any circumstances, correct physics or not, since OASBUD's RF columns are pre-formed scan lines rather than raw per-element data. See Project_Documentation.docx Section 5.2.
+- Not used for OASBUD reconstruction under any circumstances, correct physics or not, since OASBUD's RF columns are pre-formed scan lines rather than raw per-element data. See Project_Documentation_1.pdf Section 5.2.
 
 ---
 
