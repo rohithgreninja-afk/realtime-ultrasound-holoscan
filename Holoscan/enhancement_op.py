@@ -1,6 +1,7 @@
 import holoscan
 import numpy as np
 from PIL import Image
+from scipy.ndimage import median_filter
 
 class EnhancementOp(holoscan.core.Operator):
 
@@ -20,7 +21,8 @@ class EnhancementOp(holoscan.core.Operator):
     def _prepare(self, bmode):
         img_norm   = (bmode - bmode.min()) / (bmode.max() - bmode.min() + 1e-8)
         img_uint8  = (img_norm * 255).astype(np.uint8)
-        pil_img    = Image.fromarray(img_uint8, mode='L')
+        img_median = median_filter(img_uint8, size=3)   # matches Phase3_Enhancement.m medfilt2(img, [3 3])
+        pil_img    = Image.fromarray(img_median, mode='L')
         pil_resized = pil_img.resize((224, 224), Image.BILINEAR)
         pil_rgb    = pil_resized.convert('RGB')
         return np.array(pil_rgb, dtype=np.uint8)

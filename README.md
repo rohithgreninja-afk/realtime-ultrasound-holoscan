@@ -373,6 +373,8 @@ realtime-ultrasound-holoscan/
 │
 ├── Project_Documentation_1.pdf      Complete project report (background, methodology, results, references)
 │
+├── Demo Video.mov                  Project demo: both pipelines running end to end, real data, real benchmarks
+│
 ├── .gitignore
 └── README.md
 ```
