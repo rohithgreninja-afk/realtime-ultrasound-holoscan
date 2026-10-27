@@ -15,8 +15,8 @@ clearvars; clc; close all;
 %% ---- Settings ----
 dataRoot  = getenv('PLANEWAVE_DATA_PATH');
 if isempty(dataRoot)
-    dataRoot = 'C:\Users\rohit\Downloads\CIRS040GSE\CIRS040GSE';
-    fprintf('PLANEWAVE_DATA_PATH not set, using default: %s\n', dataRoot);
+    error(['PLANEWAVE_DATA_PATH environment variable not set. Point it at the folder containing ' ...
+           'USHEADER_*.mat and low_attenuation/, e.g. setenv(''PLANEWAVE_DATA_PATH'', ''/path/to/CIRS040GSE/CIRS040GSE'')']);
 end
 condition = 'low_attenuation';
 frameIdx  = 6;   % readme.txt: frames 6-10 are wire targets
@@ -100,7 +100,7 @@ nt0 = size(fk_raw, 1);
 z_image_fk = (0:nt0-1) * c / (2*fs);
 x_image_fk = x_elements;   % same physical positions as DAS's x_elements
 
-%% ---- Common post-processing: envelope, log compression, median filter ----
+%% ---- Common post-processing: envelope, log compression, bilateral filter (Phase 3 selection) ----
 function img = postprocess(raw)
     envelope = abs(hilbert(raw));
     envNorm  = envelope / (max(envelope(:)) + eps);
@@ -108,7 +108,7 @@ function img = postprocess(raw)
     db = max(db, -60);
     imgNorm  = (db + 60) / 60;
     imgUint8 = uint8(imgNorm * 255);
-    img = medfilt2(imgUint8, [3 3]);
+    img = im2uint8(imbilatfilt(im2double(imgUint8), 'DegreeOfSmoothing', 0.1, 'SpatialSigma', 2));
 end
 
 das_img = postprocess(das_raw);

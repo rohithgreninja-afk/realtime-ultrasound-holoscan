@@ -6,7 +6,7 @@
 % reference implementation requires (lens delay trim, angle-dependent
 % delay correction, channel 125 doubling), reconstructs a single-angle
 % (broadside) image using das_beamform_planewave, then applies the same
-% envelope detection + log compression + median filter used elsewhere in
+% envelope detection + log compression + bilateral filter used elsewhere in
 % this project, and displays it.
 
 clearvars; clc; close all;
@@ -14,8 +14,8 @@ clearvars; clc; close all;
 %% ---- Settings ----
 dataRoot  = getenv('PLANEWAVE_DATA_PATH');
 if isempty(dataRoot)
-    dataRoot = 'C:\Users\rohit\Downloads\CIRS040GSE\CIRS040GSE';
-    fprintf('PLANEWAVE_DATA_PATH not set, using default: %s\n', dataRoot);
+    error(['PLANEWAVE_DATA_PATH environment variable not set. Point it at the folder containing ' ...
+           'USHEADER_*.mat and low_attenuation/, e.g. setenv(''PLANEWAVE_DATA_PATH'', ''/path/to/CIRS040GSE/CIRS040GSE'')']);
 end
 condition = 'low_attenuation';
 frameIdx  = 6;   % readme.txt: frames 6-10 are wire targets, a clean visual test
@@ -92,7 +92,7 @@ tic;
 bmode_raw = das_beamform_planewave(rfSingleAngle, x_elements, z_image, x_image, fs, c, txAngle);
 fprintf('Done in %.2f s\n', toc);
 
-%% ---- Envelope detection, log compression, median filter ----
+%% ---- Envelope detection, log compression, bilateral filter ----
 envelope = abs(hilbert(bmode_raw));
 envNorm  = envelope / (max(envelope(:)) + eps);
 db = 20*log10(envNorm + 1e-6);
@@ -100,11 +100,11 @@ db = max(db, -60);
 
 imgNorm  = (db + 60) / 60;
 imgUint8 = uint8(imgNorm * 255);
-imgMedian = medfilt2(imgUint8, [3 3]);
+imgFilt = im2uint8(imbilatfilt(im2double(imgUint8), 'DegreeOfSmoothing', 0.1, 'SpatialSigma', 2));
 
 %% ---- Display ----
 figure('Position', [100 100 700 700]);
-imagesc(x_image*1000, z_image*1000, imgMedian);
+imagesc(x_image*1000, z_image*1000, imgFilt);
 colormap gray; colorbar;
 xlabel('Lateral (mm)'); ylabel('Depth (mm)');
 title(sprintf('Plane Wave Reconstruction -- Single Angle (%.1f deg)\n%s', ...

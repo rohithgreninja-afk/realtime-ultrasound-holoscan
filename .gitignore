@@ -1,5 +1,15 @@
-# MATLAB codegen build artifacts
-MATLAB Codes/codegen/
+# MATLAB codegen build artifacts. Generated CUDA source for the two live
+# GPU Coder targets is committed so the WSL2 .so can be built without MATLAB.
+MATLAB Codes/codegen/*
+!MATLAB Codes/codegen/lib/
+MATLAB Codes/codegen/lib/*
+!MATLAB Codes/codegen/lib/aline_reconstruct/
+!MATLAB Codes/codegen/lib/das_beamform_planewave/
+MATLAB Codes/codegen/lib/*/*
+!MATLAB Codes/codegen/lib/*/*.cu
+!MATLAB Codes/codegen/lib/*/*.h
+!MATLAB Codes/codegen/lib/*/*.cpp
+!MATLAB Codes/codegen/lib/*/*.hpp
 *.slxc
 slprj/
 
@@ -29,3 +39,10 @@ Thumbs.db
 
 # Full datasets (only data/sample/ is committed)
 data/full/
+
+# RESULTS_DIR duplicates and caches (committed copies of the model and split
+# live in MATLAB Codes/, the plane-wave sample in data/sample/planewave/)
+results/trainedMobileNetV2_mega.*
+results/cnn_split.mat
+results/simulink_cache/
+results/planewave_sample/

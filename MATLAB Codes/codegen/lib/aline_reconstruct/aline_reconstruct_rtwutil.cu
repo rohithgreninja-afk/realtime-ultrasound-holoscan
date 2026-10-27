@@ -1,0 +1,53 @@
+//
+// Academic License - for use in teaching, academic research, and meeting
+// course requirements at degree granting institutions only.  Not for
+// government, commercial, or other organizational use.
+// File: aline_reconstruct_rtwutil.cu
+//
+// GPU Coder version                    : 24.2
+// CUDA/C/C++ source code generated on  : 27-Oct-2026 19:17:05
+//
+
+// Include Files
+#include "aline_reconstruct_rtwutil.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+// Function Definitions
+//
+// Arguments    : cudaError_t errorCode
+//                const char *file
+//                int b_line
+// Return Type  : void
+//
+void b_checkCudaError(cudaError_t errorCode, const char *file, int b_line)
+{
+  if (errorCode != cudaSuccess) {
+    b_gpuThrowError(errorCode, cudaGetErrorName(errorCode),
+                    cudaGetErrorString(errorCode), file, b_line);
+  }
+}
+
+//
+// Arguments    : unsigned int errorCode
+//                const char *errorName
+//                const char *errorString
+//                const char *file
+//                int b_line
+// Return Type  : void
+//
+void b_gpuThrowError(unsigned int errorCode, const char *errorName,
+                     const char *errorString, const char *file, int b_line)
+{
+  fprintf(stderr,
+          "CUDA error [%d,%s] : %s\nFile: \"%s\"\nLine: %d\nTerminating "
+          "execution...",
+          errorCode, errorName, errorString, file, b_line);
+  exit(1);
+}
+
+//
+// File trailer for aline_reconstruct_rtwutil.cu
+//
+// [EOF]
+//

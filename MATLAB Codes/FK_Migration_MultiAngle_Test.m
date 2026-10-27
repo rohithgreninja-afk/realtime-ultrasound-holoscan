@@ -12,8 +12,8 @@ clearvars; clc; close all;
 %% ---- Settings ----
 dataRoot  = getenv('PLANEWAVE_DATA_PATH');
 if isempty(dataRoot)
-    dataRoot = 'C:\Users\rohit\Downloads\CIRS040GSE\CIRS040GSE';
-    fprintf('PLANEWAVE_DATA_PATH not set, using default: %s\n', dataRoot);
+    error(['PLANEWAVE_DATA_PATH environment variable not set. Point it at the folder containing ' ...
+           'USHEADER_*.mat and low_attenuation/, e.g. setenv(''PLANEWAVE_DATA_PATH'', ''/path/to/CIRS040GSE/CIRS040GSE'')']);
 end
 condition = 'low_attenuation';
 frameIdx  = 6;   % readme.txt: frames 6-10 are wire targets
@@ -136,7 +136,7 @@ function img = postprocess(raw, z_axis_mm, max_depth_mm)
     db = max(db, -60);
     imgNorm  = (db + 60) / 60;
     imgUint8 = uint8(imgNorm * 255);
-    img = medfilt2(imgUint8, [3 3]);
+    img = im2uint8(imbilatfilt(im2double(imgUint8), 'DegreeOfSmoothing', 0.1, 'SpatialSigma', 2));
 end
 
 fk_1angle_img = postprocess(fk_1angle_raw, z_axis_mm, MAX_DISPLAY_DEPTH_MM);
