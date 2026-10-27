@@ -5,18 +5,18 @@ Real-time GPU-accelerated ultrasound beamforming demonstration on genuine
 raw per-element plane wave data (CIRS040GSE / CIRS073_RUMC, Zenodo
 7986407). This is a completely separate application from the OASBUD
 pipeline in Holoscan/ -- no operators are shared beyond the enhancement
-approach (median filter selection), and there is deliberately no
+approach (bilateral filter selected in Phase 3), and there is deliberately no
 classification stage, since this dataset carries no malignant/benign
 labels. See README Dataset Strategy section for why these two pipelines
 exist separately.
 
 Usage:
   export PLANEWAVE_DATA_PATH=/path/to/CIRS040GSE
+  export RESULTS_DIR=/path/to/results   # PNGs go to RESULTS_DIR/pipeline2_frames
   python3 medical_imaging_pipeline.py [max_frames]
 
 Optional:
   export PLANEWAVE_N_ANGLES=1        # angles compounded per frame (default 1, real-time)
-  export PLANEWAVE_RESULTS_DIR=...   # where PNGs get saved
   export DAS_PLANEWAVE_CUDA_LIB_PATH=... # compiled CUDA library, falls back to numpy if absent
 """
 import sys

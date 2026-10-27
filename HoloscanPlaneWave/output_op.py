@@ -19,10 +19,9 @@ class OutputOp(holoscan.core.Operator):
         spec.input("meta")
 
     def start(self):
-        self.output_dir = os.environ.get(
-            "PLANEWAVE_RESULTS_DIR",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "planewave_results")
-        )
+        if not os.environ.get("RESULTS_DIR"):
+            raise RuntimeError("RESULTS_DIR environment variable not set. export RESULTS_DIR=/path/to/results")
+        self.output_dir = os.path.join(os.environ["RESULTS_DIR"], "pipeline2_frames")
         os.makedirs(self.output_dir, exist_ok=True)
         self.frame_times = []
         self.last_time = time.perf_counter()
