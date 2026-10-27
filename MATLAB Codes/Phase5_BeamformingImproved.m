@@ -63,17 +63,22 @@ fprintf('DAS done: %.2fs\n', toc);
 % -------------------------------------------------------------------------
 fprintf('Running DAS+CF...\n'); tic;
 
-delayed_complex = zeros(nz, nx, N);
+% Accumulate coherent and incoherent sums per element instead of storing
+% the full nz x nx x N delayed array
+sum_complex = zeros(nz, nx);
+sum_power   = zeros(nz, nx);
 for ie = 1:N
     idx = sample_idx(:,:,ie);
-    delayed_complex(:,:,ie) = reshape(rf_complex(idx, ie), nz, nx);
+    v = reshape(rf_complex(idx, ie), nz, nx);
+    sum_complex = sum_complex + v;
+    sum_power   = sum_power + abs(v).^2;
 end
 
-coh_sum   = abs(sum(delayed_complex, 3)).^2;
-incoh_sum = N * sum(abs(delayed_complex).^2, 3) + eps;
+coh_sum   = abs(sum_complex).^2;
+incoh_sum = N * sum_power + eps;
 cf        = max(0, min(1, coh_sum ./ incoh_sum));
 
-dascf_complex = sum(delayed_complex, 3) .* cf;
+dascf_complex = sum_complex .* cf;
 fprintf('DAS+CF done: %.2fs\n', toc);
 
 %% -------------------------------------------------------------------------

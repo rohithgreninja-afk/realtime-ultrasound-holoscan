@@ -24,8 +24,8 @@ clearvars; clc; close all;
 %% ---- Load real data ----
 dataRoot = getenv('PLANEWAVE_DATA_PATH');
 if isempty(dataRoot)
-    dataRoot = 'C:\Users\rohit\Downloads\CIRS040GSE\CIRS040GSE';
-    fprintf('PLANEWAVE_DATA_PATH not set, using default: %s\n', dataRoot);
+    error(['PLANEWAVE_DATA_PATH environment variable not set. Point it at the folder containing ' ...
+           'USHEADER_*.mat and low_attenuation/, e.g. setenv(''PLANEWAVE_DATA_PATH'', ''/path/to/CIRS040GSE/CIRS040GSE'')']);
 end
 condition = 'low_attenuation';
 frameIdx = 6; % wire target, per readme.txt
@@ -106,9 +106,57 @@ fprintf('This uses the real Verasonics L12-5 array geometry (%d elements, %.3f m
 fprintf('pitch) and real recorded channel data from the CIRS040GSE phantom,\n');
 fprintf('replacing the earlier synthetic point-target demonstration.\n');
 
-scriptDir = fileparts(mfilename('fullpath'));
-repoRoot = fileparts(scriptDir);
-figOutputFolder = fullfile(repoRoot, 'Project Figures', 'Phase7');
+resultsDir = getenv('RESULTS_DIR');
+if isempty(resultsDir)
+    error('RESULTS_DIR environment variable not set. Set it with setenv(''RESULTS_DIR'', ''/path/to/results'').');
+end
+figOutputFolder = fullfile(resultsDir, 'figures', 'Phase7');
 if ~exist(figOutputFolder, 'dir'), mkdir(figOutputFolder); end
 saveas(gcf, fullfile(figOutputFolder, 'phased_array_toolbox_real_data.png'));
 fprintf('Figure saved to %s\n', figOutputFolder);
+
+%% ---- 2-D image: phased.TimeDelayBeamformer scan-angle sweep vs hand-written DAS ----
+% Wideband time-delay beamforming of the same broadside frame, steered over
+% a sweep of receive angles (Direction supplied per call). Each steered
+% output is one image line; sample time t maps to range r = c*t/2 and the
+% line is drawn along its steering angle. The toolbox beamformer assumes
+% far-field plane-wave arrivals, so near-field targets are less focused than
+% in the per-pixel DAS image; the custom DAS kernel stays the GPU Coder target.
+scanAngles = -25:0.25:25;   % degrees, azimuth from broadside
+tdb = phased.TimeDelayBeamformer('SensorArray', array, 'SampleRate', fs, ...
+    'PropagationSpeed', c, 'DirectionSource', 'Input port');
+tdbLines = zeros(size(rf, 1), numel(scanAngles));
+for k = 1:numel(scanAngles)
+    tdbLines(:, k) = tdb(rf, [scanAngles(k); 0]);
+end
+range = (0:size(rf, 1)-1)' * c / (2 * fs);
+keep  = range >= 1e-3 & range <= 55e-3;   % both images cropped to 1-55 mm (edge artefacts beyond)
+range = range(keep);
+[TH, R] = meshgrid(deg2rad(scanAngles), range);
+tdbEnv = abs(hilbert(tdbLines));
+tdbEnv = tdbEnv(keep, :);
+tdbDb  = max(20*log10(tdbEnv / max(tdbEnv(:)) + eps), -60);
+
+elemPos = getElementPosition(array);
+x_elements = elemPos(2, :);
+z_das = linspace(1e-3, 55e-3, 400);
+x_das = linspace(x_elements(1), x_elements(end), 300);
+dasRaw = das_beamform_planewave(rf, x_elements, z_das, x_das, fs, c, 0);
+dasEnv = abs(hilbert(dasRaw));
+dasDb  = max(20*log10(dasEnv / max(dasEnv(:)) + eps), -60);
+
+fig2 = figure('Position', [100 100 1100 600]);
+subplot(1, 2, 1);
+surf(1000 * R .* sin(TH), 1000 * R .* cos(TH), zeros(size(R)), tdbDb, 'EdgeColor', 'none');
+view(2); axis ij image; colormap gray; clim([-60 0]); colorbar;
+xlabel('Lateral (mm)'); ylabel('Depth (mm)');
+title(sprintf('phased.TimeDelayBeamformer, %d steering angles', numel(scanAngles)));
+subplot(1, 2, 2);
+imagesc(x_das * 1000, z_das * 1000, dasDb, [-60 0]); axis image; colormap gray; colorbar;
+xlabel('Lateral (mm)'); ylabel('Depth (mm)');
+title('Hand-written plane-wave DAS (das\_beamform\_planewave.m)');
+sgtitle(sprintf('Real CIRS040GSE channel data, %s, broadside transmit', dataFiles(frameIdx).name), 'Interpreter', 'none');
+fig5Folder = fullfile(resultsDir, 'figures', 'Phase5');
+if ~exist(fig5Folder, 'dir'), mkdir(fig5Folder); end
+saveas(fig2, fullfile(fig5Folder, 'toolbox_tdb_vs_das.png'));
+fprintf('Figure saved to %s\n', fullfile(fig5Folder, 'toolbox_tdb_vs_das.png'));

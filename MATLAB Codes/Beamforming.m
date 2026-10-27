@@ -18,8 +18,10 @@ rf = data(1).rf1;
 
 % Define the output image grid
 % Lateral axis: position of each element along the probe
-x_elements = (0:num_elements-1) * pitch;
-x_elements = x_elements - mean(x_elements); % centre around zero
+% Element positions from the array model (phased.ULA is centred on zero)
+ula = phased.ULA('NumElements', num_elements, 'ElementSpacing', pitch);
+elemPos = getElementPosition(ula);
+x_elements = elemPos(2, :);
 
 % Depth axis: convert time samples to metres
 depth_axis = (0:num_samples-1) * (c / (2 * fs));

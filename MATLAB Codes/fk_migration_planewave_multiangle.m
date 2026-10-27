@@ -103,7 +103,7 @@ for k = 1:n_frames
 
     % Obliquity factor
     frameK = frameK .* f ./ fkz;
-    frameK(1) = 0;
+    frameK(1) = 0;   % only (f=0, kx=0) is 0/0 = NaN; the rest of the f=0 row is already 0
 
     % Inverse temporal FFT: rebuild negative frequencies via conjugate
     % symmetry, then IFFT
