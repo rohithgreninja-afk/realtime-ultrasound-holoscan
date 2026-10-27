@@ -49,6 +49,7 @@ lensDelay = 96;
 
 dataFiles = dir(fullfile(conditionDir, 'USDATA_*.mat'));
 assert(~isempty(dataFiles), 'No USDATA_*.mat found under %s', conditionDir);
+if numel(dataFiles) == 1, frameIdx = 1; end   % bundled sample (data/sample/planewave) holds only the wire frame
 fname = fullfile(dataFiles(frameIdx).folder, dataFiles(frameIdx).name);
 fprintf('Loading real data: %s\n', dataFiles(frameIdx).name);
 d = load(fname);

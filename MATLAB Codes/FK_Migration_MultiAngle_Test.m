@@ -45,6 +45,7 @@ fprintf('Header: %d angles, %d elements, fs=%.2f MHz, pitch=%.3f mm, c=%.0f m/s\
 %% ---- Load one data frame ----
 dataFiles = dir(fullfile(conditionDir, 'USDATA_*.mat'));
 assert(~isempty(dataFiles), 'No USDATA_*.mat found under %s', conditionDir);
+if numel(dataFiles) == 1, frameIdx = 1; end   % bundled sample (data/sample/planewave) holds only the wire frame
 fname = fullfile(dataFiles(frameIdx).folder, dataFiles(frameIdx).name);
 fprintf('Loading frame %d: %s\n', frameIdx, dataFiles(frameIdx).name);
 d = load(fname);

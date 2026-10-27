@@ -5,7 +5,7 @@
 # Beamforming: A-line hilbert + power law gamma=0.3
 # Normal handling: p_normal absorbed into p_benign (InferenceOp)
 # Predictions: binary only (benign / malignant)
-# Phase 6 benchmark: 34.0 fps mean, 29.37 ms avg latency, 73% accuracy
+# Phase 6 benchmark: see results/logs/pipeline1_benchmark_holdout.txt
 # =========================================================
 
 import holoscan
