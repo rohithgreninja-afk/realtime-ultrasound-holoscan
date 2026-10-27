@@ -1,0 +1,49 @@
+aline CUDA library loaded from ~/project/aline_cuda_src/aline_reconstruct.so
+=== Phase 6 Pipeline Benchmark ===
+OASBUD : <repo>/data/sample/OASBUD_sample.mat
+Model  : <repo>/MATLAB Codes/trainedMobileNetV2_mega.onnx
+Output : /tmp/p1_sample/pipeline1_benchmark
+Beamforming backend : CUDA (GPU Coder)
+
+Loading OASBUD ...
+  10 of 10 patients (hold-out patients only) in 306.7 ms
+
+Initialising ONNX session ...
+  Input : input_1  ['BatchSize', 3, 224, 224]
+  Output: Logits_softmax
+  EP    : CUDAExecutionProvider
+
+Warm-up (5 frames) ...
+  Done.
+
+Timing 10 frames ...
+
+==============================================================
+PHASE 6 PIPELINE BENCHMARK
+==============================================================
+  Execution provider  : CUDAExecutionProvider
+  Beamforming backend : CUDA (GPU Coder)
+  Frames timed        : 10 (hold-out patients only)
+
+  Stage                     Mean     Std     Min     Max   ms
+  ---------------------- ------- ------- ------- -------
+  Beamforming              16.15    7.11    9.87   35.88
+  Enhancement               7.73    2.92    3.97   14.54
+  Preprocess                0.04    0.00    0.04    0.05
+  ONNX Inference            2.05    0.13    1.88    2.25
+  --- Total ---            25.97    9.83   16.00   52.73
+
+  Throughput (mean frame) : 38.5 fps
+  Throughput (p95  frame) : 23.8 fps
+
+  Pipeline accuracy (hold-out patients only) : 50.0%  (5/10)
+  benign       recall=20.0%  precision=50.0%  (1/5)
+  malignant    recall=80.0%  precision=50.0%  (4/5)
+  Prediction distribution : {np.str_('benign'): 2, np.str_('malignant'): 8}
+==============================================================
+  Saved: stage_latency_bar.png
+  Saved: per_frame_latency.png
+  Saved: stage_composition.png
+  Saved: benchmark_timing.npy
+
+Benchmark complete.

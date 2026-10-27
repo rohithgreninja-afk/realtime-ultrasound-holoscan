@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
 Phase6_Pipeline_Benchmark.py
-Measures per-stage latency for all 100 OASBUD frames using the
-exact same processing logic as the Holoscan pipeline operators.
+Measures per-stage latency and accuracy on the OASBUD hold-out patients
+(patients not used for CNN training, per MATLAB Codes/cnn_split.mat),
+calling the same functions the Holoscan operators use.
+Set OASBUD_INCLUDE_TRAINING=1 to score every record in the file instead;
+that number includes training patients and is labelled as such.
 
 Run in WSL2:
   source ~/holoscan-env-310/bin/activate && ulimit -s 32768
-  python3 ~/project/Phase6_Pipeline_Benchmark.py
+  export RESULTS_DIR=/path/to/results
+  python3 Phase6_Pipeline_Benchmark.py
 """
 
 import time, os, sys
 import numpy as np
-import scipy.io as sio
 from scipy.signal import hilbert
-from PIL import Image
 import onnxruntime as ort
 import matplotlib
 matplotlib.use('Agg')
@@ -21,6 +23,9 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from aline_cuda import aline_reconstruct_cuda, cuda_available
+from data_source_op import load_oasbud_records
+from enhancement_op import prepare_tile
+from inference_op import binary_prediction
 
 # ---- Paths ----
 _THIS_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -29,9 +34,9 @@ OASBUD_PATH = os.environ.get(
     'OASBUD_PATH', os.path.join(_REPO_ROOT, 'data', 'sample', 'OASBUD_sample.mat'))
 ONNX_PATH   = os.environ.get(
     'ONNX_MODEL_PATH', os.path.join(_REPO_ROOT, 'MATLAB Codes', 'trainedMobileNetV2_mega.onnx'))
-OUTPUT_DIR  = os.environ.get(
-    'RESULTS_DIR', os.path.join(_THIS_DIR, 'phase6_figures'))
-CLASS_NAMES = ['benign', 'malignant', 'normal']
+if not os.environ.get('RESULTS_DIR'):
+    sys.exit('RESULTS_DIR environment variable not set. export RESULTS_DIR=/path/to/results')
+OUTPUT_DIR  = os.path.join(os.environ['RESULTS_DIR'], 'pipeline1_benchmark')
 N_WARMUP    = 5
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -43,7 +48,7 @@ print(f'Output : {OUTPUT_DIR}')
 print(f'Beamforming backend : {"CUDA (GPU Coder)" if cuda_available() else "scipy (fallback)"}\n')
 
 # ============================================================
-# Stage functions -- exact copies of Holoscan operator logic
+# Stage functions -- same code paths as the Holoscan operators
 # ============================================================
 
 def beamform(rf):
@@ -56,12 +61,8 @@ def beamform(rf):
     return np.power(env_norm, 0.3).astype(np.float32)
 
 def enhance(bmode):
-    """EnhancementOp._prepare  (normalise + resize 224x224 + RGB)"""
-    img_norm  = (bmode - bmode.min()) / (bmode.max() - bmode.min() + 1e-8)
-    img_uint8 = (img_norm * 255).astype(np.uint8)
-    pil_img   = Image.fromarray(img_uint8, mode='L')
-    pil_res   = pil_img.resize((224, 224), Image.BILINEAR)
-    return np.array(pil_res.convert('RGB'), dtype=np.uint8)
+    """EnhancementOp: prepare_tile (uint8, 3x3 filter, resize 224x224, RGB)"""
+    return prepare_tile(bmode)
 
 def preprocess(image):
     """InferenceOp._infer -- layout conversion only"""
@@ -71,12 +72,15 @@ def preprocess(image):
 # ============================================================
 # Load data
 # ============================================================
-print('Loading OASBUD.mat ...')
-t0       = time.perf_counter()
-mat      = sio.loadmat(OASBUD_PATH, squeeze_me=True, struct_as_record=False)
-patients = mat['data']
+print('Loading OASBUD ...')
+t0 = time.perf_counter()
+patients, n_in_file = load_oasbud_records(OASBUD_PATH)
 n_patients = len(patients)
-print(f'  {n_patients} patients in {(time.perf_counter()-t0)*1000:.1f} ms\n')
+INCLUDE_TRAINING = os.environ.get('OASBUD_INCLUDE_TRAINING', '0') == '1'
+SUBSET = 'all records, INCLUDES TRAINING PATIENTS' if INCLUDE_TRAINING else 'hold-out patients only'
+print(f'  {n_patients} of {n_in_file} patients ({SUBSET}) in {(time.perf_counter()-t0)*1000:.1f} ms\n')
+if n_patients == 0:
+    sys.exit('No hold-out patients in this file. Set OASBUD_PATH to the full OASBUD.mat.')
 
 # ============================================================
 # Init ONNX session
@@ -91,6 +95,7 @@ session    = ort.InferenceSession(
 input_name = session.get_inputs()[0].name
 active_ep  = session.get_providers()[0]
 print(f'  Input : {input_name}  {session.get_inputs()[0].shape}')
+print(f'  Output: {session.get_outputs()[0].name}')
 print(f'  EP    : {active_ep}\n')
 
 # ============================================================
@@ -98,15 +103,12 @@ print(f'  EP    : {active_ep}\n')
 # ============================================================
 print(f'Warm-up ({N_WARMUP} frames) ...')
 for i in range(N_WARMUP):
-    rf = patients[i].rf1
-    b  = beamform(rf)
-    e  = enhance(b)
-    x  = preprocess(e)
-    session.run(None, {input_name: x})
+    rf = np.asarray(patients[i % n_patients]['rf1'], dtype=np.float64)
+    session.run(None, {input_name: preprocess(enhance(beamform(rf)))})
 print('  Done.\n')
 
 # ============================================================
-# Timed run over all 100 patients
+# Timed run
 # ============================================================
 t_beamform  = np.zeros(n_patients)
 t_enhance   = np.zeros(n_patients)
@@ -117,8 +119,8 @@ preds, gt   = [], []
 
 print(f'Timing {n_patients} frames ...')
 for i, p in enumerate(patients):
-    rf  = p.rf1
-    lbl = int(getattr(p, 'class'))  # 0=malignant  1=benign
+    rf  = np.asarray(p['rf1'], dtype=np.float64)
+    lbl = int(p['class'])  # 0=benign  1=malignant
 
     frame_t0 = time.perf_counter()
 
@@ -135,14 +137,14 @@ for i, p in enumerate(patients):
     t_preproc[i] = (time.perf_counter() - t0) * 1000
 
     t0 = time.perf_counter()
-    probs    = session.run(None, {input_name: img_batch})[0][0]
-    pred_idx = int(np.argmax(probs))
+    probs = session.run(None, {input_name: img_batch})[0][0]
+    pred  = binary_prediction(probs)   # same decision as InferenceOp
     t_inference[i] = (time.perf_counter() - t0) * 1000
 
     t_total[i] = (time.perf_counter() - frame_t0) * 1000
 
-    preds.append(CLASS_NAMES[pred_idx])
-    gt.append('malignant' if lbl == 0 else 'benign')
+    preds.append(pred)
+    gt.append('malignant' if lbl == 1 else 'benign')
 
     if (i + 1) % 20 == 0:
         print(f'  {i+1}/{n_patients}  last_frame={t_total[i]:.1f} ms')
@@ -163,7 +165,7 @@ print('PHASE 6 PIPELINE BENCHMARK')
 print('=' * 62)
 print(f'  Execution provider  : {active_ep}')
 print(f'  Beamforming backend : {"CUDA (GPU Coder)" if cuda_available() else "scipy (fallback)"}')
-print(f'  Frames timed        : {n_patients}')
+print(f'  Frames timed        : {n_patients} ({SUBSET})')
 print()
 print(f'  {"Stage":<22} {"Mean":>7} {"Std":>7} {"Min":>7} {"Max":>7}   ms')
 print(f'  {"-"*22} {"-"*7} {"-"*7} {"-"*7} {"-"*7}')
@@ -184,7 +186,7 @@ print()
 print(f'  Throughput (mean frame) : {fps_mean:.1f} fps')
 print(f'  Throughput (p95  frame) : {fps_p95:.1f} fps')
 print()
-print(f'  Overall accuracy        : {100*accuracy:.1f}%  ({int(np.sum(preds==gt))}/{n_patients})')
+print(f'  Pipeline accuracy ({SUBSET}) : {100*accuracy:.1f}%  ({int(np.sum(preds==gt))}/{n_patients})')
 for cls in ['benign', 'malignant']:
     tp = int(np.sum((preds == cls) & (gt == cls)))
     fn = int(np.sum((preds != cls) & (gt == cls)))
@@ -238,7 +240,7 @@ ax2.axhline(33.3, color='orange', linestyle=':', linewidth=1.8,
             label='30 fps target (33.3 ms)')
 ax2.set_xlabel('Frame index', fontsize=12)
 ax2.set_ylabel('Total latency (ms)', fontsize=12)
-ax2.set_title('Per-Frame Total Latency -- All 100 OASBUD Patients', fontsize=13)
+ax2.set_title(f'Per-Frame Total Latency -- {n_patients} OASBUD Patients ({SUBSET})', fontsize=13)
 ax2.legend(fontsize=11)
 ax2.grid(alpha=0.3)
 plt.tight_layout()
@@ -278,6 +280,8 @@ np.save(f'{OUTPUT_DIR}/benchmark_timing.npy', {
     'preds':       preds,
     'gt':          gt,
     'accuracy':    accuracy,
+    'subset':      SUBSET,
+    'patient_ids': [str(p['id']) for p in patients],
     'fps':         fps_mean,
     'beamforming_backend': 'cuda' if cuda_available() else 'scipy',
 })

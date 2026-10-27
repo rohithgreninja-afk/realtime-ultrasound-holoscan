@@ -1,0 +1,31 @@
+OASBUD_PATH not set, using bundled sample: <repo>\data\sample\OASBUD_sample.mat
+RF size: 1824 x 510
+Method 1: Original DAS... done in 0.65s
+Method 2: DAS + TGC... done in 0.66s
+Method 3: DAS + TGC + CF (may take 1-2 min)... [Warning: HILBERT ignores imaginary part of input.] 
+[> In hilbert>hilbert_ml (line 58)
+In hilbert (line 40)
+In das_beamform_cf (line 40)
+In Phase5_ReconstructionComparison (line 68)
+In run (line 112)] 
+done in 1.04s
+Method 4: DMAS (may take 2-3 min)... done in 57.55s
+Method 5: f-k Migration... done in 3.83s
+Method 6: MVDR (phased.MVDRBeamformer, may take a few minutes)... [Warning: The number of training samples is less than twice of the number of degrees of freedom, the estimate may be poor.] 
+[> In phased/MVDRBeamformer/validateInputsImpl (line 216)
+In Phase5_ReconstructionComparison (line 107)
+In run (line 112)] 
+done in 11.64s
+
+========= Quality Metrics =========
+Method                     Dynamic Range (dB)
+----------------------------------------
+1. Original DAS            392291.00
+2. DAS + TGC               1164845.90
+3. DAS+TGC+CF                 37.45
+4. DMAS                       23.74
+5. f-k Migration              60.00
+6. MVDR (phased.MVDRBeamformer)     60.00
+
+Higher dynamic range = more visible tissue contrast.
+Figures generated. Compare arc artefact suppression.

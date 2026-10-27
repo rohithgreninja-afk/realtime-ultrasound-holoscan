@@ -1,0 +1,3 @@
+# Superseded figures
+
+These figures come from the submission before the MathWorks review and are kept for reference only. They show numbers that are no longer reported. The Phase 3 figures use the old PSNR/SSIM scoring against the unfiltered image, the Phase 4 and Phase 6 figures come from the earlier model and its unrecoverable test split, `Holoscan_phase6_figures` is the earlier pipeline benchmark that included training patients and inverted OASBUD labels, and `Phase5/aline_malignant_vs_benign.png` was produced with the inverted OASBUD label mapping. Current figures are written by the scripts to `results/figures/` and `results/pipeline1_benchmark/`.

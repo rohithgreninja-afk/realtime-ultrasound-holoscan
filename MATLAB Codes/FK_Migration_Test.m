@@ -134,7 +134,8 @@ sgtitle(sprintf('DAS vs F-K Migration -- %s, broadside %.1f deg', ...
 
 scriptDir = fileparts(mfilename('fullpath'));
 repoRoot = fileparts(scriptDir);
-figOutputFolder = fullfile(repoRoot, 'Project Figures', 'Phase7');
+if isempty(getenv('RESULTS_DIR')), error('RESULTS_DIR environment variable not set.'); end
+figOutputFolder = fullfile(getenv('RESULTS_DIR'), 'figures', 'Phase7');
 if ~exist(figOutputFolder, 'dir'), mkdir(figOutputFolder); end
 saveas(gcf, fullfile(figOutputFolder, 'das_vs_fk_migration.png'));
 fprintf('Figure saved to %s\n', figOutputFolder);

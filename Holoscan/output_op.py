@@ -17,9 +17,12 @@ class OutputOp(holoscan.core.Operator):
     def setup(self, spec):
         spec.input('scores')      # [3] float32 raw probabilities (benign/malignant/normal)
         spec.input('prediction')  # predicted class string: 'benign' or 'malignant'
-        spec.input('label')       # ground truth: 0=malignant, 1=benign
+        spec.input('label')       # ground truth: 0=benign, 1=malignant
 
     def start(self):
+        self.results_dir = os.environ.get('RESULTS_DIR')
+        if not self.results_dir:
+            raise RuntimeError('RESULTS_DIR environment variable not set. export RESULTS_DIR=/path/to/results')
         self.frame_count = 0
         self.correct     = 0
         self.results     = []
@@ -49,7 +52,7 @@ class OutputOp(holoscan.core.Operator):
         self.frame_times.append(frame_latency)
         self.last_time = now
 
-        true_class = 'benign' if label == 1 else 'malignant'
+        true_class = 'malignant' if label == 1 else 'benign'
         is_correct = (prediction == true_class)
 
         if is_correct:
@@ -108,9 +111,7 @@ class OutputOp(holoscan.core.Operator):
         print(f'  Total time          : {total_time:.2f} s')
         print('=' * 64)
 
-        _this_dir   = os.path.dirname(os.path.abspath(__file__))
-        _results_dir = os.environ.get('RESULTS_DIR', _this_dir)
-        os.makedirs(_results_dir, exist_ok=True)
-        _results_path = os.path.join(_results_dir, 'pipeline_results.npy')
+        os.makedirs(self.results_dir, exist_ok=True)
+        _results_path = os.path.join(self.results_dir, 'pipeline_results.npy')
         np.save(_results_path, self.results)
         print(f'Results saved to {_results_path}')
