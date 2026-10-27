@@ -1,6 +1,6 @@
 function bmode = beamform_fk(rf, x_elements, z_image, x_image, fs, c)
 % f-k Migration (Stolt Migration) for plane wave ultrasound
-% Works in frequency domain — fast and effective for single plane wave
+% Works in frequency domain -- fast and effective for single plane wave
 % Reference: Garcia et al., IEEE TUFFC 2013
 
 [num_samples, N] = size(rf);

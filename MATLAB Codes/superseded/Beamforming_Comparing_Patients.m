@@ -1,3 +1,5 @@
+% SUPERSEDED: replaced by Phase5_BeamformingImproved.m (multi-patient section).
+% Kept for reference only; not used by any current script or result.
 % =========================================================
 % Beamforming + Comparison Script
 % Real-Time Medical Image Processing Project
@@ -22,8 +24,10 @@ pitch = 0.30e-3;    % Element spacing: 0.30 mm
 rf = data(1).rf1;
 [num_samples, num_elements] = size(rf);
 
-x_elements = (0:num_elements-1) * pitch;
-x_elements = x_elements - mean(x_elements);
+% Element positions from the array model (phased.ULA is centred on zero)
+ula = phased.ULA('NumElements', num_elements, 'ElementSpacing', pitch);
+elemPos = getElementPosition(ula);
+x_elements = elemPos(2, :);
 
 depth_axis = (0:num_samples-1) * (c / (2 * fs));
 
@@ -117,14 +121,14 @@ figure;
 subplot(1,2,1);
 imagesc(x_image*1000, z_image*1000, bmode_log, [-60 0]);
 colormap gray; colorbar;
-title('Patient 1 — Malignant');
+title('Patient 1 -- Malignant');
 xlabel('Lateral (mm)');
 ylabel('Depth (mm)');
 
 subplot(1,2,2);
 imagesc(x_image*1000, z_image*1000, bmode_log_b, [-60 0]);
 colormap gray; colorbar;
-title(sprintf('Patient %d — Benign', benign_idx));
+title(sprintf('Patient %d -- Benign', benign_idx));
 xlabel('Lateral (mm)');
 ylabel('Depth (mm)');
 

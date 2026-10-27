@@ -1,8 +1,10 @@
+% SUPERSEDED: replaced by phased.MVDRBeamformer in Phase5_ReconstructionComparison.m.
+% Kept for reference only; not used by any current script or result.
 function bmode = beamform_mvbf(rf, x_elements, z_image, x_image, fs, c)
-% Minimum Variance Beamformer (MVBF) — Capon beamformer
+% Minimum Variance Beamformer (MVBF) -- Capon beamformer
 % Computes per-pixel adaptive weights that minimise output variance
 % Much stronger artefact suppression than DAS
-% Note: slow — uses a subarray approach for tractability
+% Note: slow -- uses a subarray approach for tractability
 
 N  = size(rf, 2);
 nz = length(z_image);

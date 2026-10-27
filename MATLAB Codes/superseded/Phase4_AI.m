@@ -1,3 +1,5 @@
+% SUPERSEDED: replaced by Phase4_MegaTrain.m (five-dataset training, current APIs, saved split).
+% Kept for reference only; not used by any current script or result.
 % =========================================================
 % Phase4_AI.m
 % AI-Based Classification using BUSI Dataset
@@ -70,7 +72,7 @@ disp(countEachLabel(imdsTrain));
 
 % ── Part 2: Preprocessing and Augmentation ───────────────
 % All images must be resized to 224x224 for MobileNetV2
-% Images are RGB uint8 — no conversion needed
+% Images are RGB uint8 -- no conversion needed
 
 inputSize = [224 224 3];
 
@@ -89,7 +91,7 @@ augimdsTrain = augmentedImageDatastore(inputSize, imdsTrain, ...
     'DataAugmentation', augmenter, ...
     'ColorPreprocessing', 'gray2rgb');
 
-% Validation and test — resize only, no augmentation
+% Validation and test -- resize only, no augmentation
 augimdsVal  = augmentedImageDatastore(inputSize, imdsVal, ...
     'ColorPreprocessing', 'gray2rgb');
 augimdsTest = augmentedImageDatastore(inputSize, imdsTest, ...
@@ -199,7 +201,7 @@ fprintf('  Overall Accuracy: %.2f%%\n', accuracy);
 % Confusion matrix
 figure;
 cm = confusionchart(trueLabels, predLabels, ...
-    'Title', 'Phase 4 — Test Set Confusion Matrix', ...
+    'Title', 'Phase 4 -- Test Set Confusion Matrix', ...
     'RowSummary', 'row-normalized', ...
     'ColumnSummary', 'column-normalized');
 cm.FontSize = 12;
