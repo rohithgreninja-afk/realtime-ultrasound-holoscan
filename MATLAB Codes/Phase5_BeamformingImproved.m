@@ -147,7 +147,8 @@ end
 sgtitle(sprintf('Patient %d (Class %d) -- Compression Comparison', ...
     patIdx, data.data(patIdx).class));
 
-figOutputFolder = fullfile(repoRoot, 'Project Figures', 'Phase5');
+if isempty(getenv('RESULTS_DIR')), error('RESULTS_DIR environment variable not set.'); end
+figOutputFolder = fullfile(getenv('RESULTS_DIR'), 'figures', 'Phase5');
 if ~exist(figOutputFolder, 'dir'), mkdir(figOutputFolder); end
 saveas(gcf, fullfile(figOutputFolder, 'beamforming_compression_comparison.png'));
 fprintf('Figure saved\n');
@@ -179,7 +180,7 @@ for p = 1:3
     env_p   = abs(das_p);
     bmode_p = compress_power(env_p, 0.3);
 
-    if data.data(p).class == 0
+    if data.data(p).class == 1   % OASBUD class: 0 = benign, 1 = malignant
         lstr = 'Malignant';
     else
         lstr = 'Benign';

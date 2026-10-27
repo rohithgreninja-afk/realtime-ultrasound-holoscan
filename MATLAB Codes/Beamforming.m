@@ -116,6 +116,6 @@ figure;
 imagesc(bmode_log, [-dynamic_range 0]);
 colormap gray;
 colorbar;
-title('B-Mode Image - Patient 1 (Malignant)');
+title('B-Mode Image - Patient 1');
 xlabel('Lateral pixels');
 ylabel('Depth pixels');

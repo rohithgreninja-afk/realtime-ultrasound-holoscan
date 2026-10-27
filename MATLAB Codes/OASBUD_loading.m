@@ -20,7 +20,7 @@ disp(fieldnames(data));
 
 %displaying rf data of one patient
 disp(data(1).id); % patient id
-disp(data(1).class); %mm is malignant
+disp(data(1).class); % class: 0 = benign, 1 = malignant
 disp(size(data(1).rf1)); %rf signal array dimensions
 disp(class(data(1).rf1)); % rf signal array data
 
@@ -29,7 +29,7 @@ figure;
 imagesc(data(1).rf1);
 colormap gray;
 colorbar;
-title('Raw RF Data - Patient 1 (Malignant)');
+title('Raw RF Data - Patient 1');
 xlabel('Transducer Elements');
 ylabel('Time Samples (Depth)');
 

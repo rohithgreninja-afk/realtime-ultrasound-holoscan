@@ -24,7 +24,7 @@ fs    = 40e6;
 c     = 1540;
 pitch = 0.30e-3;
 
-% ── Patient 1 (Malignant) ────────────────────────────────
+% ── Patient 1 of the loaded file ─────────────────────────
 rf = data(1).rf1;
 [num_samples, num_elements] = size(rf);
 fprintf('RF size: %d x %d\n', num_samples, num_elements);
@@ -126,7 +126,7 @@ for i = 1:6
     xlabel('Lateral (mm)'); ylabel('Depth (mm)');
     caxis([-60 0]);
 end
-sgtitle('Phase 5 -- Reconstruction Method Comparison (Patient 1 Malignant)', ...
+sgtitle('Phase 5 -- Reconstruction Method Comparison (Patient 1)', ...
         'FontSize', 12, 'FontWeight', 'bold');
 
 % ── Compute quality metrics ──────────────────────────────
