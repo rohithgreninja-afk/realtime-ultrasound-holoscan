@@ -270,7 +270,7 @@ PLANEWAVE_DATA_PATH=../data/sample/planewave python3 medical_imaging_pipeline.py
 
 Timings depend on the machine and load; the values above are the committed logs in `results/logs/`. Accuracy values are deterministic for a given model.
 
-A re-run on 28 October 2026 on the owner's RTX 4070 Laptop GPU reproduced every accuracy and verification figure above exactly (CUDA vs scipy 7.64e-13, pipeline accuracy 55.0% (33/60), Pipeline 2 CUDA vs numpy 0.00e+00, enhancement ranking with bilateral selected). Its timings were close to the committed logs: Pipeline 1 about 36.6 fps mean, and Pipeline 2 about 1.9 fps with data loading still the dominant stage. The raw outputs are in `results/logs/rerun_2026-10-28/`.
+A re-run on 28 October 2026 on the owner's RTX 4070 Laptop GPU reproduced every accuracy and verification figure above exactly (CUDA vs scipy 7.64e-13, pipeline accuracy 55.0% (33/60) on both the CUDA and scipy backends, Pipeline 2 CUDA vs numpy 0.00e+00, enhancement ranking with bilateral selected, FK multi-angle CNR improvement 63.4%). Its timings were close to the committed logs: Pipeline 1 about 36.6 fps mean on CUDA and 26.8 fps on scipy, and Pipeline 2 about 1.9 fps with data loading still the dominant stage. The raw outputs are in `results/logs/rerun_2026-10-28/`.
 
 ---
 
@@ -413,7 +413,7 @@ The full datasets [1]-[6] are not bundled because of their size; see the referen
 
 ## Open items
 
-The video link above is a placeholder for the owner to fill in. `Project_Documentation_1.pdf` and `Project_Documentation_v1.9_draft.docx` still contain the pre-review results and the median filter choice, and need to be updated by the owner from this README. The README is the current source of truth.
+The video link above is a placeholder for the owner to fill in. `Project_Documentation_v2.0.docx` replaces the two earlier documents. The earlier PDF and DOCX draft are pre-review versions kept for reference only, and the README is the current source of truth.
 
 ---
 
