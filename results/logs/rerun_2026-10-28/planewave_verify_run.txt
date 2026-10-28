@@ -1,0 +1,12 @@
+das_beamform_planewave CUDA library loaded from /home/rohit/das_planewave_src/das_beamform_planewave.so
+Plane wave header loaded (low_attenuation): 75 angles, 128 elements, fs=31.25 MHz, pitch=0.195 mm, c=1540 m/s
+Found 20 frame(s) in low_attenuation
+Frame 0 (USDATA_20220330104522673.mat): max abs diff = 0.00e+00, mean abs diff = 0.00e+00
+Frame 1 (USDATA_20220330104534275.mat): max abs diff = 0.00e+00, mean abs diff = 0.00e+00
+Frame 2 (USDATA_20220330104546412.mat): max abs diff = 0.00e+00, mean abs diff = 0.00e+00
+Frame 3 (USDATA_20220330104601333.mat): max abs diff = 0.00e+00, mean abs diff = 0.00e+00
+Frame 4 (USDATA_20220330104611445.mat): max abs diff = 0.00e+00, mean abs diff = 0.00e+00
+
+Overall max abs diff across 5 frame(s): 0.00e+00
+PASS: CUDA output matches numpy reference within floating point tolerance.
+Safe to proceed with wiring das_cuda_planewave into BeamformingOp.

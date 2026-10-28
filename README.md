@@ -270,6 +270,8 @@ PLANEWAVE_DATA_PATH=../data/sample/planewave python3 medical_imaging_pipeline.py
 
 Timings depend on the machine and load; the values above are the committed logs in `results/logs/`. Accuracy values are deterministic for a given model.
 
+A re-run on 28 October 2026 on the owner's RTX 4070 Laptop GPU reproduced every accuracy and verification figure above exactly (CUDA vs scipy 7.64e-13, pipeline accuracy 55.0% (33/60), Pipeline 2 CUDA vs numpy 0.00e+00, enhancement ranking with bilateral selected). Its timings were close to the committed logs: Pipeline 1 about 36.6 fps mean, and Pipeline 2 about 1.9 fps with data loading still the dominant stage. The raw outputs are in `results/logs/rerun_2026-10-28/`.
+
 ---
 
 ## Repository Structure

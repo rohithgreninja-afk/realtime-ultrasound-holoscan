@@ -1,0 +1,52 @@
+aline CUDA library loaded from /home/rohit/project/aline_cuda_src/aline_reconstruct.so
+=== Phase 6 Pipeline Benchmark ===
+OASBUD : /mnt/c/Users/rohit/Downloads/Real Time Image Processing Project/OASBUD.mat
+Model  : /mnt/c/Projects/realtime-ultrasound-holoscan/MATLAB Codes/trainedMobileNetV2_mega.onnx
+Output : /mnt/c/Projects/realtime-ultrasound-holoscan/results_check3/pipeline1_benchmark
+Beamforming backend : CUDA (GPU Coder)
+
+Loading OASBUD ...
+  60 of 100 patients (hold-out patients only) in 3535.4 ms
+
+Initialising ONNX session ...
+  Input : input_1  ['BatchSize', 3, 224, 224]
+  Output: Logits_softmax
+  EP    : CUDAExecutionProvider
+
+Warm-up (5 frames) ...
+  Done.
+
+Timing 60 frames ...
+  20/60  last_frame=25.7 ms
+  40/60  last_frame=32.5 ms
+  60/60  last_frame=22.9 ms
+
+==============================================================
+PHASE 6 PIPELINE BENCHMARK
+==============================================================
+  Execution provider  : CUDAExecutionProvider
+  Beamforming backend : CUDA (GPU Coder)
+  Frames timed        : 60 (hold-out patients only)
+
+  Stage                     Mean     Std     Min     Max   ms
+  ---------------------- ------- ------- ------- -------
+  Beamforming              16.05    5.31   10.43   44.92
+  Enhancement               8.27    3.18    4.11   19.39
+  Preprocess                0.05    0.02    0.03    0.14
+  ONNX Inference            2.93    0.82    1.90    5.27
+  --- Total ---            27.31    8.33   16.76   66.16
+
+  Throughput (mean frame) : 36.6 fps
+  Throughput (p95  frame) : 24.8 fps
+
+  Pipeline accuracy (hold-out patients only) : 55.0%  (33/60)
+  benign       recall=21.4%  precision=54.5%  (6/28)
+  malignant    recall=84.4%  precision=55.1%  (27/32)
+  Prediction distribution : {np.str_('benign'): 11, np.str_('malignant'): 49}
+==============================================================
+  Saved: stage_latency_bar.png
+  Saved: per_frame_latency.png
+  Saved: stage_composition.png
+  Saved: benchmark_timing.npy
+
+Benchmark complete.

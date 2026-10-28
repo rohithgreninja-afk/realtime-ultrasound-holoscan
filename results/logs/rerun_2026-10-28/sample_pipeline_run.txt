@@ -1,0 +1,62 @@
+[info] [fragment.cpp:1142] Loading extensions from configs...
+[info] [gxf_executor.cpp:566] Creating context
+[info] [gxf_executor.cpp:2780] Activating Graph...
+[info] [entity_pool.cpp:134] EntityPool::GetShared: created new shared pool for context 0x27319340 with capacity 256
+[info] [gxf_executor.cpp:2921] Running Graph...
+[info] [gxf_executor.cpp:2923] Waiting for completion...
+[info] [greedy_scheduler.cpp:191] Scheduling 5 entities
+[info] [greedy_scheduler.cpp:405] Scheduler stopped: Some entities are waiting for execution, but there are no periodic or async entities to get out of the deadlock.
+[info] [greedy_scheduler.cpp:435] Scheduler finished.
+[info] [gxf_executor.cpp:2930] Deactivating Graph...
+[info] [gxf_executor.cpp:2939] Graph execution finished.
+aline CUDA library loaded from /home/rohit/project/aline_cuda_src/aline_reconstruct.so
+Starting Medical Imaging Pipeline v1.7 -- 10 frames
+Model  : trainedMobileNetV2_mega.onnx
+Beamform: A-line Hilbert + power law gamma=0.3
+Output : binary (benign / malignant), normal absorbed into benign
+
+Dataset loaded: 10 of 10 patient records (hold-out patients only)
+BeamformingOp ready -- A-line mode, CUDA (GPU Coder)
+Loading ONNX model from /mnt/c/Projects/realtime-ultrasound-holoscan/MATLAB Codes/trainedMobileNetV2_mega.onnx
+Model loaded. Input: input_1 | EP: CUDAExecutionProvider
+Normal handling: p_normal absorbed into p_benign before decision.
+
+================================================================
+  Medical Imaging Pipeline v1.7 -- Results
+================================================================
+Frame  True         Predicted    Confidence  OK?
+----------------------------------------------------------------
+Frame 1/10 emitted | Label: benign | RF shape: (1824, 510)
+1      benign       benign            99.4%  OK
+Frame 2/10 emitted | Label: benign | RF shape: (2080, 510)
+2      benign       malignant         61.2%  --
+Frame 3/10 emitted | Label: benign | RF shape: (1040, 510)
+3      benign       malignant        100.0%  --
+Frame 4/10 emitted | Label: benign | RF shape: (1568, 510)
+4      benign       malignant        100.0%  --
+Frame 5/10 emitted | Label: benign | RF shape: (1040, 510)
+5      benign       malignant         98.0%  --
+Frame 6/10 emitted | Label: malignant | RF shape: (2080, 510)
+6      malignant    malignant        100.0%  OK
+Frame 7/10 emitted | Label: malignant | RF shape: (2080, 510)
+7      malignant    malignant         90.2%  OK
+Frame 8/10 emitted | Label: malignant | RF shape: (2608, 510)
+8      malignant    malignant         99.9%  OK
+Frame 9/10 emitted | Label: malignant | RF shape: (1824, 510)
+9      malignant    malignant        100.0%  OK
+Frame 10/10 emitted | Label: malignant | RF shape: (1824, 510)
+10     malignant    benign            71.4%  --
+================================================================
+  Pipeline Summary
+================================================================
+  Frames processed    : 10
+  Overall accuracy    : 50.0%  (5/10)
+  Malignant recall    : 80.0%  (4/5  caught)
+  Benign recall       : 20.0%  (1/5  caught)
+  Missed cancers      : 1
+  Avg frame latency   : 33.8 ms
+  Throughput          : 12.3 fps
+  Total time          : 0.81 s
+================================================================
+Results saved to /mnt/c/Projects/realtime-ultrasound-holoscan/results_check3/pipeline_results.npy
+[info] [gxf_executor.cpp:601] Destroying context
