@@ -210,7 +210,7 @@ Preprocessing choice: the B-mode is scaled to uint8 directly, with no min-max re
 
 `Simulink/UltrasoundPipelineDiagram.slx` is an architecture diagram of the five pipeline stages.
 
-`Simulink/UltrasoundEnhancementSubsystem.slx` is a functional model. A From Workspace block feeds an OASBUD RF matrix (`rf_ts`) through two MATLAB Function blocks, EnvelopeDetection (Hilbert envelope, 60 dB log compression, normalised to 0 to 1) and Enhancement (the Phase 3 bilateral filter, scaled to 0 to 255), into a To Workspace block (`enhanced_bmode`). Run it with `Simulink/run_enhancement_subsystem.m`, which builds `rf_ts` as a timeseries shaped [nSamples nElements nTime], calls `sim`, shows the output and checks that it is finite, the size of the input and not all zero. On the first bundled sample patient the output is 1824 x 510 with values from 10.51 to 247.38 (`results/figures/Simulink/Simulink_Functional_Output.png`). The model uses log compression for display, while the deployed classifier path uses the gamma 0.3 power law. CNN training, GPU Coder acceleration and deployment were done in MATLAB and Holoscan.
+`Simulink/UltrasoundEnhancementSubsystem.slx` is a functional model. A From Workspace block feeds an OASBUD RF matrix (`rf_ts`) through two MATLAB Function blocks, EnvelopeDetection (Hilbert envelope, 60 dB log compression, normalised to 0 to 1) and Enhancement (the Phase 3 bilateral filter, scaled to 0 to 255), into a To Workspace block (`enhanced_bmode`). Run it with `Simulink/run_enhancement_subsystem.m`, which builds `rf_ts` as a timeseries shaped [nSamples nElements nTime], calls `sim`, shows the output and checks that it is finite, the size of the input and not all zero. On the first bundled sample patient the output is 1824 x 510 with values from 9.55 to 244.25 (`results/figures/Simulink/Simulink_Functional_Output.png`). The model uses log compression for display, while the deployed classifier path uses the gamma 0.3 power law. CNN training, GPU Coder acceleration and deployment were done in MATLAB and Holoscan.
 
 ![Simulink Pipeline Diagram](Project%20Figures/Simulink/Simulink_Pipeline_Diagram_Simple.png)
 
@@ -242,7 +242,7 @@ Environment variables used:
 5. `Phase7_PhasedArrayToolbox_RealData` and `FK_Migration_MultiAngle_Test` with `PLANEWAVE_DATA_PATH`, `RESULTS_DIR`. The second prints `CNR improvement: 63.4%`. Writes `figures/Phase5/toolbox_tdb_vs_das.png` and `figures/Phase7/`.
 6. `Phase5_ReconstructionComparison` and `Phase5_BeamformingImproved` with `OASBUD_PATH` (optional), `RESULTS_DIR`. Comparison figures only.
 7. `aline_run_codegen` and `das_run_codegen_planewave` (GPU Coder, CUDA 12.6, VS2022). Write CUDA source to `codegen/lib/aline_reconstruct/` and `codegen/lib/das_beamform_planewave/`; the committed copies of that source are already there.
-8. From `Simulink/`: `run_enhancement_subsystem` with `RESULTS_DIR`. Prints `Simulink output: 1824 x 510, range 10.51 to 247.38`.
+8. From `Simulink/`: `run_enhancement_subsystem` with `RESULTS_DIR`. Prints `Simulink output: 1824 x 510, range 9.55 to 244.25`.
 
 **Holoscan (WSL2, Python 3.10, Holoscan 4.2.0):**
 
