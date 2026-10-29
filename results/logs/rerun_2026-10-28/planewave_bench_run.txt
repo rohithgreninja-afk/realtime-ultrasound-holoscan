@@ -1,0 +1,41 @@
+das_beamform_planewave CUDA library loaded from /home/rohit/das_planewave_src/das_beamform_planewave.so
+=== Plane Wave Pipeline Benchmark ===
+Beamforming backend : CUDA (GPU Coder)
+Output              : /mnt/c/Projects/realtime-ultrasound-holoscan/results_check3/pipeline2_benchmark
+
+Plane wave header loaded (low_attenuation): 75 angles, 128 elements, fs=31.25 MHz, pitch=0.195 mm, c=1540 m/s
+Found 20 frame(s) in low_attenuation
+Frames to benchmark : 20
+Backend confirmed   : CUDA
+
+Warm-up frame (JIT/first-call overhead)...
+Done.
+
+Timing 20 frames...
+  5/20  last_frame=496.2 ms
+  10/20  last_frame=528.2 ms
+  15/20  last_frame=495.5 ms
+  20/20  last_frame=482.7 ms
+
+==============================================================
+PLANE WAVE PIPELINE BENCHMARK (per stage, single broadside angle)
+==============================================================
+  Beamforming backend : CUDA (GPU Coder)
+  Frames timed        : 20
+
+  Stage              Mean      Std      Min      Max   ms
+  -------------- -------- -------- -------- --------
+  Data load        478.88    81.98   291.78   626.60
+  Beamforming        8.34     0.75     6.97     9.84
+  Enhancement        5.40     4.66     3.55    25.48
+  Save              22.67    20.98    14.49   110.68
+  --- Total ---    515.37    78.05   321.09   655.88
+
+  Throughput (mean frame) : 1.9 fps
+  Beamforming share of total: 1.6%
+==============================================================
+
+Saved: planewave_stage_latency_bar.png
+Saved: planewave_benchmark_timing.npy
+
+Benchmark complete.

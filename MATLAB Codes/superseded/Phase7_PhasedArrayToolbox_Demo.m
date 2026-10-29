@@ -1,3 +1,5 @@
+% SUPERSEDED: replaced by Phase7_PhasedArrayToolbox_RealData.m (real CIRS040GSE channel data).
+% Kept for reference only; not used by any current script or result.
 % Phase7_PhasedArrayToolbox_Demo.m
 % =========================================================
 % Phased Array System Toolbox compliance demonstration
@@ -85,7 +87,7 @@ title('phased.PhaseShiftBeamformer Output, Real Part');
 xlabel('Sample'); ylabel('Amplitude');
 grid on;
 
-sgtitle('Phased Array System Toolbox — ULA + PhaseShiftBeamformer Demo');
+sgtitle('Phased Array System Toolbox -- ULA + PhaseShiftBeamformer Demo');
 
 scriptDir = fileparts(mfilename('fullpath'));
 repoRoot  = fileparts(scriptDir);

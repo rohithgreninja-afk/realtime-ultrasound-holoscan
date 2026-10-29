@@ -1,8 +1,15 @@
 % Phase4_OASBUD_Export.m
-% Export 20 malignant + 20 benign OASBUD patients as PNG training images
-% Uses A-line reconstruction (hilbert + power law) -- same as pipeline
-% Applies heavy augmentation to each patient to generate multiple images
-% Output: OASBUD_PNG_PATH/malignant/ and /benign/
+% Export the first N malignant + first N benign OASBUD patients as PNG
+% training images, plus augmented copies (imageDataAugmenter).
+% Uses A-line reconstruction (hilbert + power law), same as the pipeline.
+% Output: OASBUD_PNG_PATH/malignant/ and /benign/, plus
+%         OASBUD_PNG_PATH/oasbud_export_manifest.mat listing the exported
+%         patients. Every patient not listed there is an OASBUD hold-out
+%         patient for Phase6_CNN_Evaluation.m Section 9 and the pipeline benchmark.
+%
+% OASBUD class field: 0 = benign, 1 = malignant. This matches the dataset's
+% 48/52 benign/malignant counts and its BI-RADS field (class 0 is mostly
+% BI-RADS 3, class 1 mostly 4c/5).
 
 clearvars; clc;
 
@@ -18,126 +25,87 @@ end
 
 outRoot = getenv('OASBUD_PNG_PATH');
 if isempty(outRoot)
-    outRoot = fullfile(repoRoot, 'data', 'OASBUD_PNG');
-    fprintf('OASBUD_PNG_PATH not set, defaulting to %s\n', outRoot);
+    error('OASBUD_PNG_PATH environment variable not set. Set it with setenv(''OASBUD_PNG_PATH'', ''/path/to/OASBUD_PNG'').');
 end
 
-fs         = 40e6;
-c          = 1540;
-probeWidth = 38e-3;
-gamma      = 0.3;
-imgSize    = [224 224];
-augPerPat  = 20;   % generate 20 augmented versions per patient
+nPerClass = 20;    % first N patients of each class are exported for training
+augPerPat = 20;    % augmented versions per patient
+gamma     = 0.3;
+imgSize   = [224 224];
+classNames = ["benign" "malignant"];   % index = class field + 1
+rng(42);
 
-% Training patient indices (from class distribution check)
-train_mal = [1 2 3 5 7 8 9 12 15 16 17 19 21 23 24 25 26 27 30 32];
-train_ben = [4 6 10 11 13 14 18 20 22 28 29 31 35 60 61 62 63 64 65 66];
+augmenter = imageDataAugmenter( ...
+    'RandXReflection',  true, ...
+    'RandRotation',     [-20 20], ...
+    'RandScale',        [1 1.15], ...
+    'RandXTranslation', [-10 10], ...
+    'RandYTranslation', [-10 10]);
 
-%% Create output folders
-mkdir(fullfile(outRoot, 'malignant'));
-mkdir(fullfile(outRoot, 'benign'));
-fprintf('Output folders created at %s\n', outRoot);
-
-%% Load dataset
+%% Load dataset and select patients from the loaded class field
 data = load(dataPath);
-fprintf('OASBUD loaded: %d patients\n', numel(data.data));
+cls  = arrayfun(@(s) double(s.class), data.data);
+ids  = arrayfun(@(s) string(s.id), data.data);
+fprintf('OASBUD loaded: %d patients (%d benign, %d malignant)\n', ...
+    numel(cls), sum(cls == 0), sum(cls == 1));
 
-%% Export function
-function bmode = reconstruct(rf, fs, c, gamma)
-    env   = abs(hilbert(rf));
-    norm  = env / (max(env(:)) + 1e-12);
-    bmode = norm .^ gamma;
-end
-
-%% Process training patients
-allIdx    = {train_mal, train_ben};
-allLabels = {'malignant', 'benign'};
-
-for cls = 1:2
-    patList = allIdx{cls};
-    label   = allLabels{cls};
-    outDir  = fullfile(outRoot, label);
-    count   = 0;
-
-    for p = 1:numel(patList)
-        patIdx = patList(p);
-        rf     = double(data.data(patIdx).rf1);
-
-        % Base reconstruction
-        bmode = reconstruct(rf, fs, c, gamma);
-
-        % Resize to 224x224
-        bmode_img = imresize(bmode, imgSize);
-
-        % Save base image
-        count = count + 1;
-        fname = sprintf('oasbud_%s_p%03d_base.png', label, patIdx);
-        imwrite(uint8(bmode_img * 255), fullfile(outDir, fname));
-
-        % Also save rf2 view as second base image
-        rf2       = double(data.data(patIdx).rf2);
-        bmode2    = reconstruct(rf2, fs, c, gamma);
-        bmode2_img = imresize(bmode2, imgSize);
-        count = count + 1;
-        fname2 = sprintf('oasbud_%s_p%03d_view2.png', label, patIdx);
-        imwrite(uint8(bmode2_img * 255), fullfile(outDir, fname2));
-
-        % Heavy augmentation -- generate augPerPat versions
-        for aug = 1:augPerPat
-            img = bmode_img;
-
-            % 1: Random horizontal flip
-            if rand > 0.5
-                img = fliplr(img);
-            end
-
-            % 2: Random rotation -20 to +20 degrees
-            angle = (rand - 0.5) * 40;
-            img   = imrotate(img, angle, 'bilinear', 'crop');
-
-            % 3: Random brightness shift -0.15 to +0.15
-            img = img + (rand - 0.5) * 0.3;
-            img = max(0, min(1, img));
-
-            % 4: Random contrast scaling 0.7 to 1.3
-            mu  = mean(img(:));
-            img = (img - mu) * (0.7 + rand * 0.6) + mu;
-            img = max(0, min(1, img));
-
-            % 5: Random Gaussian noise sigma 0 to 0.04
-            img = img + randn(size(img)) * rand * 0.04;
-            img = max(0, min(1, img));
-
-            % 6: Random zoom crop 85-100% then resize back
-            zoomFactor = 0.85 + rand * 0.15;
-            cropSize   = round(imgSize * zoomFactor);
-            startR = randi(imgSize(1) - cropSize(1) + 1);
-            startC = randi(imgSize(2) - cropSize(2) + 1);
-            img    = img(startR:startR+cropSize(1)-1, startC:startC+cropSize(2)-1);
-            img    = imresize(img, imgSize);
-
-            % 7: Random elastic-like deformation via small grid warp
-            [X, Y] = meshgrid(1:imgSize(2), 1:imgSize(1));
-            strength = 4;
-            dx = strength * (rand(imgSize) - 0.5);
-            dy = strength * (rand(imgSize) - 0.5);
-            dx = imgaussfilt(dx, 8);
-            dy = imgaussfilt(dy, 8);
-            Xw = max(1, min(imgSize(2), X + dx));
-            Yw = max(1, min(imgSize(1), Y + dy));
-            img = interp2(X, Y, img, Xw, Yw, 'linear', 0);
-
-            count = count + 1;
-            fname = sprintf('oasbud_%s_p%03d_aug%03d.png', label, patIdx, aug);
-            imwrite(uint8(img * 255), fullfile(outDir, fname));
-        end
-
-        fprintf('Patient %d (%s): %d images generated\n', patIdx, label, augPerPat + 2);
+selIdx = [];
+for k = [1 0]
+    idx = find(cls(:) == k);
+    if numel(idx) < nPerClass
+        warning('Only %d %s patients available, exporting all of them.', numel(idx), classNames(k+1));
     end
-
-    fprintf('\n%s total images: %d\n\n', label, count);
+    selIdx = [selIdx; idx(1:min(nPerClass, numel(idx)))]; %#ok<AGROW>
 end
 
-fprintf('Export complete.\n');
+%% Refuse to mix with an earlier export
+for lbl = classNames
+    outDir = fullfile(outRoot, lbl);
+    if ~exist(outDir, 'dir'), mkdir(outDir); end
+    if ~isempty(dir(fullfile(outDir, '*.png')))
+        error('%s already contains PNG files. Point OASBUD_PNG_PATH at an empty folder.', outDir);
+    end
+end
+
+%% Export
+for p = selIdx'
+    label  = classNames(cls(p) + 1);
+    outDir = fullfile(outRoot, label);
+    stem   = sprintf('oasbud_%s_r%03d_%s', char(label), p, char(regexprep(lower(ids(p)), '[^a-z0-9]', '')));
+
+    base = imresize(reconstruct(double(data.data(p).rf1), gamma), imgSize);
+    writeChecked(base, outDir, [stem '_base.png'], data.data(p).class, classNames);
+    view2 = imresize(reconstruct(double(data.data(p).rf2), gamma), imgSize);
+    writeChecked(view2, outDir, [stem '_view2.png'], data.data(p).class, classNames);
+
+    for a = 1:augPerPat
+        img = augment(augmenter, base);
+        writeChecked(img, outDir, sprintf('%s_aug%03d.png', stem, a), data.data(p).class, classNames);
+    end
+    fprintf('Patient %3d %-14s (%s): %d images\n', p, ids(p), label, augPerPat + 2);
+end
+
+exportedIdx = selIdx;
+exportedIds = ids(selIdx);
+exportedClass = cls(selIdx);
+[~, sourceFile] = fileparts(dataPath);
+save(fullfile(outRoot, 'oasbud_export_manifest.mat'), ...
+    'exportedIdx', 'exportedIds', 'exportedClass', 'sourceFile', 'nPerClass', 'augPerPat');
+
+fprintf('\nExport complete.\n');
 fprintf('Malignant training images: %d\n', numel(dir(fullfile(outRoot,'malignant','*.png'))));
-fprintf('Benign training images: %d\n',    numel(dir(fullfile(outRoot,'benign','*.png'))));
+fprintf('Benign training images:    %d\n', numel(dir(fullfile(outRoot,'benign','*.png'))));
+
+function bmode = reconstruct(rf, gamma)
+    env   = abs(hilbert(rf));
+    bmode = (env / (max(env(:)) + 1e-12)) .^ gamma;
+end
+
+function writeChecked(img, outDir, fname, classField, classNames)
+    % Guard: the folder name must match the label derived from the class field
+    [~, folderLabel] = fileparts(outDir);
+    if ~strcmp(folderLabel, classNames(double(classField) + 1))
+        error('Label guard: class %d would be written to %s', classField, outDir);
+    end
+    imwrite(im2uint8(img), fullfile(outDir, fname));
+end

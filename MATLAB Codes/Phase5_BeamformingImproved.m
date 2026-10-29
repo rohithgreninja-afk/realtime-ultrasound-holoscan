@@ -63,17 +63,22 @@ fprintf('DAS done: %.2fs\n', toc);
 % -------------------------------------------------------------------------
 fprintf('Running DAS+CF...\n'); tic;
 
-delayed_complex = zeros(nz, nx, N);
+% Accumulate coherent and incoherent sums per element instead of storing
+% the full nz x nx x N delayed array
+sum_complex = zeros(nz, nx);
+sum_power   = zeros(nz, nx);
 for ie = 1:N
     idx = sample_idx(:,:,ie);
-    delayed_complex(:,:,ie) = reshape(rf_complex(idx, ie), nz, nx);
+    v = reshape(rf_complex(idx, ie), nz, nx);
+    sum_complex = sum_complex + v;
+    sum_power   = sum_power + abs(v).^2;
 end
 
-coh_sum   = abs(sum(delayed_complex, 3)).^2;
-incoh_sum = N * sum(abs(delayed_complex).^2, 3) + eps;
+coh_sum   = abs(sum_complex).^2;
+incoh_sum = N * sum_power + eps;
 cf        = max(0, min(1, coh_sum ./ incoh_sum));
 
-dascf_complex = sum(delayed_complex, 3) .* cf;
+dascf_complex = sum_complex .* cf;
 fprintf('DAS+CF done: %.2fs\n', toc);
 
 %% -------------------------------------------------------------------------
@@ -142,7 +147,8 @@ end
 sgtitle(sprintf('Patient %d (Class %d) -- Compression Comparison', ...
     patIdx, data.data(patIdx).class));
 
-figOutputFolder = fullfile(repoRoot, 'Project Figures', 'Phase5');
+if isempty(getenv('RESULTS_DIR')), error('RESULTS_DIR environment variable not set.'); end
+figOutputFolder = fullfile(getenv('RESULTS_DIR'), 'figures', 'Phase5');
 if ~exist(figOutputFolder, 'dir'), mkdir(figOutputFolder); end
 saveas(gcf, fullfile(figOutputFolder, 'beamforming_compression_comparison.png'));
 fprintf('Figure saved\n');
@@ -174,7 +180,7 @@ for p = 1:3
     env_p   = abs(das_p);
     bmode_p = compress_power(env_p, 0.3);
 
-    if data.data(p).class == 0
+    if data.data(p).class == 1   % OASBUD class: 0 = benign, 1 = malignant
         lstr = 'Malignant';
     else
         lstr = 'Benign';

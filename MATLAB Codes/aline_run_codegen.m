@@ -28,6 +28,7 @@ cfg = coder.gpuConfig('lib');
 cfg.GpuConfig.SelectCudaDevice = 0;   % RTX 4070 is device 0
 cfg.GpuConfig.MallocMode       = 'discrete';
 cfg.GenerateReport             = true;
+cfg.GenCodeOnly                = true;   % CUDA source only; the WSL2 .so is built from it (README Setup)
 
 fprintf('Toolchain: %s\n', cfg.Toolchain);
 fprintf('GPU device: %d\n', cfg.GpuConfig.SelectCudaDevice);

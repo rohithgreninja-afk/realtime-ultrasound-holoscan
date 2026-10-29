@@ -12,8 +12,8 @@ clearvars; clc; close all;
 %% ---- Settings ----
 dataRoot  = getenv('PLANEWAVE_DATA_PATH');
 if isempty(dataRoot)
-    dataRoot = 'C:\Users\rohit\Downloads\CIRS040GSE\CIRS040GSE';
-    fprintf('PLANEWAVE_DATA_PATH not set, using default: %s\n', dataRoot);
+    error(['PLANEWAVE_DATA_PATH environment variable not set. Point it at the folder containing ' ...
+           'USHEADER_*.mat and low_attenuation/, e.g. setenv(''PLANEWAVE_DATA_PATH'', ''/path/to/CIRS040GSE/CIRS040GSE'')']);
 end
 condition = 'low_attenuation';
 frameIdx  = 6;   % readme.txt: frames 6-10 are wire targets
@@ -45,6 +45,7 @@ fprintf('Header: %d angles, %d elements, fs=%.2f MHz, pitch=%.3f mm, c=%.0f m/s\
 %% ---- Load one data frame ----
 dataFiles = dir(fullfile(conditionDir, 'USDATA_*.mat'));
 assert(~isempty(dataFiles), 'No USDATA_*.mat found under %s', conditionDir);
+if numel(dataFiles) == 1, frameIdx = 1; end   % bundled sample (data/sample/planewave) holds only the wire frame
 fname = fullfile(dataFiles(frameIdx).folder, dataFiles(frameIdx).name);
 fprintf('Loading frame %d: %s\n', frameIdx, dataFiles(frameIdx).name);
 d = load(fname);
@@ -136,7 +137,7 @@ function img = postprocess(raw, z_axis_mm, max_depth_mm)
     db = max(db, -60);
     imgNorm  = (db + 60) / 60;
     imgUint8 = uint8(imgNorm * 255);
-    img = medfilt2(imgUint8, [3 3]);
+    img = im2uint8(imbilatfilt(im2double(imgUint8), 'DegreeOfSmoothing', 0.1, 'SpatialSigma', 2));
 end
 
 fk_1angle_img = postprocess(fk_1angle_raw, z_axis_mm, MAX_DISPLAY_DEPTH_MM);
@@ -164,7 +165,8 @@ sgtitle(sprintf('F-K Migration: 1 Angle vs %d Angles, Full Range -- %s', ...
 
 scriptDir = fileparts(mfilename('fullpath'));
 repoRoot = fileparts(scriptDir);
-figOutputFolder = fullfile(repoRoot, 'Project Figures', 'Phase7');
+if isempty(getenv('RESULTS_DIR')), error('RESULTS_DIR environment variable not set.'); end
+figOutputFolder = fullfile(getenv('RESULTS_DIR'), 'figures', 'Phase7');
 if ~exist(figOutputFolder, 'dir'), mkdir(figOutputFolder); end
 saveas(gcf, fullfile(figOutputFolder, 'fk_single_vs_multiangle.png'));
 fprintf('Figure saved to %s\n', figOutputFolder);

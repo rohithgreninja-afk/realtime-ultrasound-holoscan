@@ -1,3 +1,5 @@
+% SUPERSEDED: replaced by buildCombinedDatastore.m (BUS-UCLM loading and Doppler filtering).
+% Kept for reference only; not used by any current script or result.
 % =========================================================
 % BUS_UCLM_Explore.m
 % Explore and audit the BUS-UCLM dataset structure
@@ -38,7 +40,7 @@ end
 imgFiles = dir(fullfile(busUCLMPath, 'images', '*.png'));
 fprintf('\nTotal PNG files in images folder: %d\n', length(imgFiles));
 
-% ── Visual check — show one image per class ───────────────
+% ── Visual check -- show one image per class ───────────────
 figure('Position', [100 100 1200 400]);
 plotIdx = 1;
 for i = 1:length(classes)
@@ -53,7 +55,7 @@ for i = 1:length(classes)
           'Interpreter', 'none', 'FontSize', 9);
     plotIdx = plotIdx + 1;
 end
-sgtitle('BUS-UCLM — One Sample Per Class');
+sgtitle('BUS-UCLM -- One Sample Per Class');
 
 % ── Filter out images with black borders (Marks = Yes means annotations) ──
 % Also filter Doppler = Yes since those have colour overlay

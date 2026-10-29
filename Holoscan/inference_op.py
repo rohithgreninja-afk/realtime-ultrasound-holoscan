@@ -18,6 +18,13 @@ import numpy as np
 import onnxruntime as ort
 
 
+def binary_prediction(probs):
+    """Merge normal into benign (both mean not cancer), then decide."""
+    p_benign    = float(probs[0]) + float(probs[2])
+    p_malignant = float(probs[1])
+    return 'malignant' if p_malignant > p_benign else 'benign'
+
+
 class InferenceOp(holoscan.core.Operator):
 
     CLASSES   = ['benign', 'malignant', 'normal']
@@ -58,11 +65,6 @@ class InferenceOp(holoscan.core.Operator):
 
         outputs = self.session.run(None, {self.input_name: img_batch})
         probs   = outputs[0][0].copy()
-
-        # Merge normal into benign -- both mean not cancer
-        p_benign    = float(probs[0]) + float(probs[2])
-        p_malignant = float(probs[1])
-
-        prediction = 'malignant' if p_malignant > p_benign else 'benign'
+        prediction = binary_prediction(probs)
 
         return probs.astype(np.float32), prediction

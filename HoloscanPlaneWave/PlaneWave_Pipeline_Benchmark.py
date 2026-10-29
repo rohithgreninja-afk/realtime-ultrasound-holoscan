@@ -19,7 +19,6 @@ import time
 import numpy as np
 from PIL import Image
 from scipy.signal import hilbert
-from scipy.ndimage import median_filter
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -27,10 +26,12 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from data_source_op import DataSourceOp
 from das_cuda_planewave import das_beamform_planewave, cuda_available
+from enhancement_op import prepare_bmode
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.environ.get('PLANEWAVE_RESULTS_DIR',
-                             os.path.join(_THIS_DIR, 'planewave_benchmark_results'))
+if not os.environ.get('RESULTS_DIR'):
+    sys.exit('RESULTS_DIR environment variable not set. export RESULTS_DIR=/path/to/results')
+OUTPUT_DIR = os.path.join(os.environ['RESULTS_DIR'], 'pipeline2_benchmark')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 print('=== Plane Wave Pipeline Benchmark ===')
@@ -39,13 +40,8 @@ print(f'Output              : {OUTPUT_DIR}\n')
 
 
 def enhance(bmode):
-    envelope = abs(hilbert(bmode, axis=0))
-    env_norm = envelope / (envelope.max() + 1e-12)
-    db = 20 * np.log10(env_norm + 1e-6)
-    db = np.clip(db, -60, 0)
-    img_norm = (db + 60) / 60
-    img_uint8 = (img_norm * 255).astype(np.uint8)
-    return median_filter(img_uint8, size=3)
+    """EnhancementOp: prepare_bmode (envelope, log compression, bilateral filter)"""
+    return prepare_bmode(bmode)
 
 
 op = DataSourceOp.__new__(DataSourceOp)

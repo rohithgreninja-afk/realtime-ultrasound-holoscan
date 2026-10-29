@@ -36,8 +36,10 @@ pitch = 0.30e-3;     % Element spacing: 0.30 mm (L14-5/38 transducer)
 rf = data(1).rf1;
 [num_samples, num_elements] = size(rf);
 
-x_elements = (0:num_elements-1) * pitch;
-x_elements = x_elements - mean(x_elements);
+% Element positions from the array model (phased.ULA is centred on zero)
+ula = phased.ULA('NumElements', num_elements, 'ElementSpacing', pitch);
+elemPos = getElementPosition(ula);
+x_elements = elemPos(2, :);
 
 depth_axis = (0:num_samples-1) * (c / (2*fs));
 
@@ -46,7 +48,7 @@ z_image = linspace(depth_axis(1),  depth_axis(end), 300);
 
 % ── Define argument types for codegen ────────────────────
 % These tell GPU Coder the exact size and type of each input
-% [0 0] means fixed size — not variable
+% [0 0] means fixed size -- not variable
 arg_rf         = coder.typeof(rf,         [num_samples, num_elements], [0 0]);
 arg_x_elements = coder.typeof(x_elements, [1, num_elements],           [0 0]);
 arg_z_image    = coder.typeof(z_image,    [1, 300],                    [0 0]);
@@ -82,4 +84,4 @@ for i = 1:length(files)
         fprintf('  %-45s  %.1f KB\n', files(i).name, files(i).bytes/1024);
     end
 end
-fprintf('\nKey file: das_beamform.cu — this is your CUDA kernel.\n');
+fprintf('\nKey file: das_beamform.cu -- this is your CUDA kernel.\n');

@@ -7,7 +7,7 @@
 %   3. DAS + TGC + Coherence Factor
 %   4. DMAS (Delay-Multiply-and-Sum)
 %   5. f-k Migration
-%   6. MVBF (Minimum Variance Beamformer) — slow, runs last
+%   6. MVDR (phased.MVDRBeamformer, Phased Array System Toolbox), runs last
 % =========================================================
 
 scriptDir = fileparts(mfilename('fullpath'));
@@ -24,14 +24,16 @@ fs    = 40e6;
 c     = 1540;
 pitch = 0.30e-3;
 
-% ── Patient 1 (Malignant) ────────────────────────────────
+% ── Patient 1 of the loaded file ─────────────────────────
 rf = data(1).rf1;
 [num_samples, num_elements] = size(rf);
 fprintf('RF size: %d x %d\n', num_samples, num_elements);
 
 % ── Build grids ──────────────────────────────────────────
-x_elements = (0:num_elements-1)*pitch;
-x_elements = x_elements - mean(x_elements);
+% Element positions from the array model (phased.ULA is centred on zero)
+ula = phased.ULA('NumElements', num_elements, 'ElementSpacing', pitch);
+elemPos = getElementPosition(ula);
+x_elements = elemPos(2, :);
 depth_axis  = (0:num_samples-1)*(c/(2*fs));
 x_image     = linspace(x_elements(1), x_elements(end), 200);
 z_image     = linspace(depth_axis(1),  depth_axis(end), 300);
@@ -86,18 +88,33 @@ t5 = toc;
 fprintf('done in %.2fs\n', t5);
 
 % ═══════════════════════════════════════════════════════
-% METHOD 6: MVBF — WARNING: very slow (5-10 mins)
+% METHOD 6: MVDR (Phased Array System Toolbox phased.MVDRBeamformer)
 % ═══════════════════════════════════════════════════════
-fprintf('Method 6: MVBF (slow — 5-10 mins)... ');
+% Each image column is delay-aligned to its focal points, so the array is
+% steered to broadside; the column's depth samples are the snapshots used
+% for the covariance estimate.
+fprintf('Method 6: MVDR (phased.MVDRBeamformer, may take a few minutes)... ');
 tic;
-bmode_mvbf = beamform_mvbf(rf_tgc, x_elements, z_image, x_image, fs, c);
+rfc_tgc = hilbert(rf_tgc);
+rfc_tgc = rfc_tgc / sqrt(mean(abs(rfc_tgc(:)).^2));   % unit power so the loading factor is relative
+mvdr = phased.MVDRBeamformer('SensorArray', ula, 'OperatingFrequency', 10e6, ...
+    'PropagationSpeed', c, 'Direction', [0; 0], 'DiagonalLoadingFactor', 0.01);
+mvdr_env = zeros(numel(z_image), numel(x_image));
+for ix = 1:numel(x_image)
+    dist = sqrt((x_image(ix) - x_elements).^2 + z_image(:).^2);
+    idx  = min(max(round((2 * dist / c) * fs) + 1, 1), num_samples);
+    aligned = rfc_tgc(idx + (0:num_elements-1) * num_samples);
+    mvdr_env(:, ix) = abs(mvdr(aligned));
+end
+bmode_mvdr = 20*log10(mvdr_env + eps);
+bmode_mvdr = max(bmode_mvdr - max(bmode_mvdr(:)), -60);
 t6 = toc;
 fprintf('done in %.2fs\n', t6);
 
 % ── Plot all 6 methods ───────────────────────────────────
-methods = {bmode_das, bmode_tgc, bmode_cf, bmode_dmas, bmode_fk, bmode_mvbf};
+methods = {bmode_das, bmode_tgc, bmode_cf, bmode_dmas, bmode_fk, bmode_mvdr};
 titles  = {'1. Original DAS', '2. DAS + TGC', '3. DAS+TGC+CF', ...
-           '4. DMAS', '5. f-k Migration', '6. MVBF (Adaptive)'};
+           '4. DMAS', '5. f-k Migration', '6. MVDR (phased.MVDRBeamformer)'};
 times   = {t1, t2, t3, t4, t5, t6};
 
 figure('Position', [50 50 1600 800]);
@@ -109,7 +126,7 @@ for i = 1:6
     xlabel('Lateral (mm)'); ylabel('Depth (mm)');
     caxis([-60 0]);
 end
-sgtitle('Phase 5 — Reconstruction Method Comparison (Patient 1 Malignant)', ...
+sgtitle('Phase 5 -- Reconstruction Method Comparison (Patient 1)', ...
         'FontSize', 12, 'FontWeight', 'bold');
 
 % ── Compute quality metrics ──────────────────────────────

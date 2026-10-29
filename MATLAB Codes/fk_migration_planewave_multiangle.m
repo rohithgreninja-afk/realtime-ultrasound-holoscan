@@ -23,11 +23,12 @@ function bmode_raw = fk_migration_planewave_multiangle(rf, fs, pitch, c, tx_angl
 %
 %   Verified 2026-07-25 against a real wire-target frame from CIRS040GSE
 %   (FK_Migration_MultiAngle_Test.m): wires resolve to sharp discrete
-%   points at consistent positions across 1 vs 15 compounded angles.
+%   points at consistent positions across 1 vs 75 compounded angles.
 %   Measured on the raw envelope, using the same function for both angle
-%   counts to keep the comparison numerically valid: 15-angle compounding
-%   reduced background noise (std dev) by ~40% and improved
-%   contrast-to-noise ratio by 56% versus a single angle (606.6 -> 946.3).
+%   counts to keep the comparison numerically valid: 75-angle compounding
+%   reduced the background std dev from 20.53 to 12.05 and improved the
+%   contrast-to-noise ratio by 63.4% versus a single angle (121.9 -> 199.2),
+%   results/logs/FK_Migration_MultiAngle_Test.txt.
 %   An earlier attempt at this fix had a bug: the (nx0-1)*(angle<0)
 %   steering-angle offset term was initially omitted, which silently
 %   misaligned negative-angle frames before compounding and mostly
@@ -103,7 +104,7 @@ for k = 1:n_frames
 
     % Obliquity factor
     frameK = frameK .* f ./ fkz;
-    frameK(1) = 0;
+    frameK(1) = 0;   % only (f=0, kx=0) is 0/0 = NaN; the rest of the f=0 row is already 0
 
     % Inverse temporal FFT: rebuild negative frequencies via conjugate
     % symmetry, then IFFT

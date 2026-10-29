@@ -1,6 +1,6 @@
 function bmode = beamform_dmas(rf, x_elements, z_image, x_image, fs, c)
 % Delay-Multiply-and-Sum (DMAS) beamformer
-% Multiplies pairs of delayed signals — suppresses incoherent noise naturally
+% Multiplies pairs of delayed signals -- suppresses incoherent noise naturally
 % Reference: Matrone et al., IEEE TUFFC 2015
 
 N  = size(rf, 2);

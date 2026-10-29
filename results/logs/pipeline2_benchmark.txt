@@ -1,0 +1,41 @@
+das_beamform_planewave CUDA library loaded from ~/das_planewave_src/das_beamform_planewave.so
+=== Plane Wave Pipeline Benchmark ===
+Beamforming backend : CUDA (GPU Coder)
+Output              : <repo>/results/pipeline2_benchmark
+
+Plane wave header loaded (low_attenuation): 75 angles, 128 elements, fs=31.25 MHz, pitch=0.195 mm, c=1540 m/s
+Found 20 frame(s) in low_attenuation
+Frames to benchmark : 20
+Backend confirmed   : CUDA
+
+Warm-up frame (JIT/first-call overhead)...
+Done.
+
+Timing 20 frames...
+  5/20  last_frame=309.9 ms
+  10/20  last_frame=528.3 ms
+  15/20  last_frame=517.4 ms
+  20/20  last_frame=559.4 ms
+
+==============================================================
+PLANE WAVE PIPELINE BENCHMARK (per stage, single broadside angle)
+==============================================================
+  Beamforming backend : CUDA (GPU Coder)
+  Frames timed        : 20
+
+  Stage              Mean      Std      Min      Max   ms
+  -------------- -------- -------- -------- --------
+  Data load        419.17    86.60   270.62   555.78
+  Beamforming        7.68     0.79     6.94    10.48
+  Enhancement        8.20    17.66     3.27    85.12
+  Save              26.16    27.18    13.68   119.49
+  --- Total ---    461.27    83.23   304.92   587.95
+
+  Throughput (mean frame) : 2.2 fps
+  Beamforming share of total: 1.7%
+==============================================================
+
+Saved: planewave_stage_latency_bar.png
+Saved: planewave_benchmark_timing.npy
+
+Benchmark complete.

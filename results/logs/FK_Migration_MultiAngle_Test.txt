@@ -1,0 +1,15 @@
+Header: 75 angles, 128 elements, fs=31.25 MHz, pitch=0.195 mm, c=1540 m/s
+Loading frame 6: USDATA_20220330104648803.mat
+Using 75 angles: -16.0 to 16.0 degrees
+Running fk_migration_planewave_multiangle with 1 angle...
+Done in 0.24 s
+Running fk_migration_planewave_multiangle with 75 angles (this will take longer)...
+Done in 9.77 s
+
+=== Quantitative contrast comparison (same function, valid comparison) ===
+Metric                         1 angle    75 angles
+Mean wire peak                    2503         2400
+Background std dev               20.53        12.05
+Contrast-to-noise ratio          121.9        199.2
+CNR improvement: 63.4%
+Figure saved to <repo>\results\figures\Phase7

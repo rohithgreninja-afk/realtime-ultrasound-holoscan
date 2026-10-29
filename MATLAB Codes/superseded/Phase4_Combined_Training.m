@@ -1,3 +1,5 @@
+% SUPERSEDED: replaced by Phase4_MegaTrain.m (five-dataset training, current APIs, saved split).
+% Kept for reference only; not used by any current script or result.
 % Phase4_Combined_Training.m
 % Retrain MobileNetV2 on BUSI + BUS-UCLM (combined dataset)
 % Malignant weight pushed to 3.0

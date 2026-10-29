@@ -38,6 +38,7 @@ cfg = coder.gpuConfig('lib');
 cfg.GpuConfig.SelectCudaDevice = 0;
 cfg.GpuConfig.MallocMode       = 'discrete';
 cfg.GenerateReport             = true;
+cfg.GenCodeOnly                = true;   % CUDA source only; the WSL2 .so is built from it (README Setup)
 
 fprintf('\nRunning GPU Coder on das_beamform_planewave (variable-size)...\n');
 codegen('das_beamform_planewave', '-config', cfg, '-args', ...

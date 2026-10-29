@@ -1,13 +1,17 @@
 % Phase6_CNN_Evaluation.m
 % =========================================================
-% Phase 6 - Comprehensive CNN Evaluation (Mega Model)
+% Phase 6 - CNN Evaluation (Mega Model) on the saved hold-out split
 % =========================================================
-% Generates: confusion matrix, per-class metrics, ROC curve,
-%            precision-recall curve, latency table,
-%            OASBUD authentic test results.
+% Loads the committed model (trainedMobileNetV2_mega.mat) and the split
+% file written by Phase4_MegaTrain.m (cnn_split.mat). Never re-splits.
 %
-% DOES NOT RETRAIN. Loads trainedMobileNetV2_mega.mat only.
-% Estimated run time: 10-15 min (classify 665 images, GPU).
+% Sections 2-8 (combined test set) need the dataset environment variables
+% listed in buildCombinedDatastore.m; if any is missing they are skipped
+% with a warning. Section 9 (OASBUD hold-out patients) runs on the bundled
+% sample with only the committed model and split file.
+%
+% Output (RESULTS_DIR): cnn_eval.mat, cnn_eval.md, oasbud_holdout_eval.mat,
+%                       figures/Phase6/*.png
 % =========================================================
 clearvars; close all; clc;
 
@@ -15,356 +19,194 @@ clearvars; close all; clc;
 scriptDir = fileparts(mfilename('fullpath'));
 repoRoot  = fileparts(scriptDir);
 
-matFilePath = fullfile(scriptDir, 'trainedMobileNetV2_mega.mat');
-figDir      = fullfile(repoRoot, 'Project Figures', 'Phase6');
-if ~exist(figDir,'dir'), mkdir(figDir); end
+resultsDir = getenv('RESULTS_DIR');
+if isempty(resultsDir)
+    error('RESULTS_DIR environment variable not set. Set it with setenv(''RESULTS_DIR'', ''/path/to/results'').');
+end
+figDir = fullfile(resultsDir, 'figures', 'Phase6');
+if ~exist(figDir, 'dir'), mkdir(figDir); end
 
-busiRoot = getenv('BUSI_PATH');
-if isempty(busiRoot)
-    error(['BUSI_PATH environment variable not set. Set it with: ' ...
-           'setenv(''BUSI_PATH'', ''/path/to/Dataset_BUSI_with_GT'')']);
-end
-uclmRoot = getenv('BUS_UCLM_PATH');
-if isempty(uclmRoot)
-    error(['BUS_UCLM_PATH environment variable not set. Set it with: ' ...
-           'setenv(''BUS_UCLM_PATH'', ''/path/to/BUS-UCLM'')']);
-end
-busbraRoot = getenv('BUSBRA_PATH');
-if isempty(busbraRoot)
-    error(['BUSBRA_PATH environment variable not set. Set it with: ' ...
-           'setenv(''BUSBRA_PATH'', ''/path/to/BUSBRA'')']);
-end
-breastRoot = getenv('BREAST_IMG_PATH');
-breastXLSX = getenv('BREAST_XLSX_PATH');
-if isempty(breastRoot) || isempty(breastXLSX)
-    error(['BREAST_IMG_PATH and BREAST_XLSX_PATH environment variables not set. Set with: ' ...
-           'setenv(''BREAST_IMG_PATH'', ''/path/to/BrEaST-Lesions_USG-images_and_masks''); ' ...
-           'setenv(''BREAST_XLSX_PATH'', ''/path/to/BrEaST-Lesions-USG-clinical-data-Dec-15-2023.xlsx'')']);
-end
-oasbud_png = getenv('OASBUD_PNG_PATH');
-if isempty(oasbud_png)
-    oasbud_png = fullfile(repoRoot, 'data', 'OASBUD_PNG');
-    fprintf('OASBUD_PNG_PATH not set, defaulting to %s\n', oasbud_png);
-end
 oasbud_mat = getenv('OASBUD_PATH');
 if isempty(oasbud_mat)
     oasbud_mat = fullfile(repoRoot, 'data', 'sample', 'OASBUD_sample.mat');
     fprintf('OASBUD_PATH not set, using bundled sample: %s\n', oasbud_mat);
 end
 
-fprintf('=== Phase 6 CNN Evaluation ===\n');
-fprintf('Figures -> %s\n\n', figDir);
-
-%% ===== SECTION 1: LOAD MODEL =====
-fprintf('[1/9] Loading mega model...\n');
-S = load(matFilePath);
-trainedNet = S.trainedNet;          % DAGNetwork
-classNames = categorical(S.classNames);  % [benign, malignant, normal]
-trainInfo  = S.trainInfo;           % training history
+%% ===== SECTION 1: LOAD MODEL AND SPLIT =====
+fprintf('[1/9] Loading mega model and split file...\n');
+S = load(fullfile(scriptDir, 'trainedMobileNetV2_mega.mat'));
+trainedNet = S.trainedNet;
+classNames = string(S.classNames(:))';   % [benign malignant normal]
+split = load(fullfile(scriptDir, 'cnn_split.mat'));
 fprintf('  Network class:  %s\n', class(trainedNet));
-fprintf('  Output classes: %s\n', strjoin(string(classNames), ', '));
-fprintf('  Final val accuracy (from training): %.2f%%\n\n', trainInfo.FinalValidationAccuracy);
+fprintf('  Output classes: %s\n', strjoin(classNames, ', '));
+fprintf('  Split seed: %d | train %d | val %d | test %d images\n', split.seed, ...
+    numel(split.trainFiles), numel(split.valFiles), numel(split.testFiles));
 
-%% ===== SECTION 2: RECONSTRUCT COMBINED DATASTORE =====
-fprintf('[2/9] Reconstructing combined imageDatastore...\n');
+%% ===== SECTIONS 2-8: COMBINED TEST SET =====
+dsVars = {'BUSI_PATH','BUS_UCLM_PATH','BUSBRA_PATH','BREAST_IMG_PATH','BREAST_XLSX_PATH','OASBUD_PNG_PATH'};
+missingVars = dsVars(cellfun(@(v) isempty(getenv(v)), dsVars));
+runTestSet = isempty(missingVars);
+if ~runTestSet
+    warning('Skipping Sections 2-8 (combined test set): %s not set.', strjoin(missingVars, ', '));
+end
 
-% --- BUSI (folder-based labels) ---
-dsBUSI = imageDatastore(busiRoot, 'IncludeSubfolders', true, ...
-    'LabelSource', 'foldernames', 'FileExtensions', '.png');
-% Keep only non-mask images and relabel in one rebuild
-keepIdx = ~contains(dsBUSI.Files, '_mask');
-dsBUSI  = imageDatastore(dsBUSI.Files(keepIdx), ....
-    'Labels', categorical(lower(string(dsBUSI.Labels(keepIdx)))));
-fprintf('  BUSI:         %4d images\n', numel(dsBUSI.Files));
-
-% --- BUS-UCLM (CSV labels, Doppler filtered) ---
-info_uclm = readtable(fullfile(uclmRoot, 'INFO.csv'));
-keepIdx   = strcmp(info_uclm.Doppler, 'No');
-info_uclm = info_uclm(keepIdx, :);
-uclmFiles = string(fullfile(uclmRoot, 'images', string(info_uclm.Image)));
-existMask   = isfile(uclmFiles);
-uclmLabels  = categorical(lower(string(info_uclm.Label(existMask))));
-dsUCLM = imageDatastore(uclmFiles(existMask), 'Labels', uclmLabels);
-fprintf('  BUS-UCLM:     %4d images\n', numel(dsUCLM.Files));
-
-% --- BUS-BRA (CSV labels, dual-view -l/-r images) ---
-busbra_csv  = readtable(fullfile(busbraRoot, 'bus_data.csv'));
-imgDir_bra  = fullfile(busbraRoot, 'Images');
-% Each CSV row is one image: ID = filename without .png
-busbraFiles  = {};
-busbraLabels = {};
-for i = 1:height(busbra_csv)
-    fname = fullfile(imgDir_bra, [char(busbra_csv.ID{i}) '.png']);
-    lbl   = char(lower(busbra_csv.Pathology{i}));
-    if isfile(fname) && ismember(lbl, {'benign','malignant'})
-        busbraFiles{end+1}  = fname;
-        busbraLabels{end+1} = lbl;
+if runTestSet
+    % --- SECTION 2: rebuild datastore and select the saved test files ---
+    fprintf('\n[2/9] Building combined datastore and selecting saved test files...\n');
+    [dsCombined, meta] = buildCombinedDatastore();
+    [found, loc] = ismember(split.testFiles, cellstr(meta.Key));
+    if ~all(found)
+        error('%d test files from cnn_split.mat are missing from the datasets, e.g. %s', ...
+            sum(~found), split.testFiles{find(~found, 1)});
     end
-end
-dsBUSBRA = imageDatastore(busbraFiles', 'Labels', categorical(busbraLabels'));
-fprintf('  BUS-BRA:      %4d images\n', numel(dsBUSBRA.Files));
+    overlap = intersect(split.testFiles, [split.trainFiles; split.valFiles]);
+    assert(isempty(overlap), 'Split file has %d files in both test and train/val.', numel(overlap));
+    dsTest = subset(dsCombined, loc);
+    testLabels_true = dsTest.Labels;
+    fprintf('  Test set: %d images\n', numel(dsTest.Files));
+    tabulate(string(testLabels_true));
 
-% --- BrEaST (XLSX labels matched to image files) ---
-tbl_breast = readtable(breastXLSX);
-% Column names check -- print first time to verify
-% disp(tbl_breast.Properties.VariableNames)
-breastFiles  = {};
-breastLabels = {};
-allPNGs = dir(fullfile(breastRoot, '*.png'));
-if isempty(allPNGs)
-    allPNGs = dir(fullfile(breastRoot, '**', '*.png'));
-end
-for i = 1:height(tbl_breast)
-    lbl = lower(strtrim(string(tbl_breast.Classification(i))));
-    if ~ismember(lbl, {'benign','malignant','normal'}), continue; end
-    % Try to find matching PNG by case identifier
-    % Adjust 'Case' to the actual ID column name in your XLSX if needed
-    % Image_filename column holds exact filename e.g. 'case001.png'
-    imgFname = strtrim(string(tbl_breast.Image_filename(i)));
-    % Skip mask files (contain '_tumor' or '_other')
-    if contains(imgFname, '_tumor') || contains(imgFname, '_other'), continue; end
-    matchPNG = fullfile(breastRoot, char(imgFname));
-    if ~isfile(matchPNG), continue; end
-    breastFiles{end+1}  = matchPNG;
-    breastLabels{end+1} = char(lbl);
-end
-dsBrEaST = imageDatastore(breastFiles', 'Labels', categorical(breastLabels'));
-fprintf('  BrEaST:       %4d images\n', numel(dsBrEaST.Files));
+    % --- SECTION 3/4: classify test set (GPU) ---
+    fprintf('\n[3-4/9] Classifying test set...\n');
+    augTest = augmentedImageDatastore([224 224 3], dsTest, 'ColorPreprocessing', 'gray2rgb');
+    tic;
+    scores = minibatchpredict(trainedNet, augTest, 'MiniBatchSize', 32);
+    t_classify_total = toc;
+    predLabels = scores2label(scores, classNames);
+    testLabels_true = categorical(testLabels_true, classNames);
+    accuracy = mean(predLabels == testLabels_true);
+    fprintf('  Overall accuracy:  %.2f%%\n', 100*accuracy);
+    fprintf('  Avg per image:     %.2f ms (batched)\n', 1000*t_classify_total/numel(dsTest.Files));
 
-% --- OASBUD PNG (folder-based labels) ---
-dsOASBUD_png = imageDatastore(oasbud_png, 'IncludeSubfolders', true, ...
-    'LabelSource', 'foldernames', 'FileExtensions', '.png');
-dsOASBUD_png.Labels = categorical(lower(string(dsOASBUD_png.Labels)));
-fprintf('  OASBUD-PNG:   %4d images\n', numel(dsOASBUD_png.Files));
+    % --- SECTION 5: confusion matrix ---
+    fprintf('[5/9] Confusion matrix...\n');
+    confMat = confusionmat(testLabels_true, predLabels, 'Order', categorical(classNames));
+    fig_cm = figure('Name','Confusion Matrix','Position',[50 50 720 620]);
+    cm = confusionchart(testLabels_true, predLabels, ...
+        'Title', sprintf('Mega Model Test Set  (n=%d)   Accuracy: %.2f%%', ...
+                         numel(dsTest.Files), 100*accuracy), ...
+        'RowSummary', 'row-normalized', 'ColumnSummary', 'column-normalized');
+    cm.FontSize = 12;
+    saveas(fig_cm, fullfile(figDir, 'confusion_matrix_test.png'));
 
-% --- Combine all five sources ---
-allFiles  = [dsBUSI.Files; dsUCLM.Files; dsBUSBRA.Files; ...
-             dsBrEaST.Files; dsOASBUD_png.Files];
-allLabels = categorical([string(dsBUSI.Labels);  string(dsUCLM.Labels); ...
-                         string(dsBUSBRA.Labels); string(dsBrEaST.Labels); ...
-                         string(dsOASBUD_png.Labels)]);
-dsCombined = imageDatastore(allFiles, 'Labels', allLabels);
-fprintf('\n  Combined total: %d images\n', numel(dsCombined.Files));
-tabulate(string(dsCombined.Labels));
-
-%% ===== SECTION 3: SPLIT -- SAME SEED AS TRAINING =====
-fprintf('\n[3/9] Splitting with rng(42) to recover test partition...\n');
-rng(42);
-[~, ~, dsTest] = splitEachLabel(dsCombined, 0.70, 0.15, 0.15, 'randomized');
-testLabels_true = dsTest.Labels;
-fprintf('  Test set: %d images\n', numel(dsTest.Files));
-tabulate(string(testLabels_true));
-
-%% ===== SECTION 4: CLASSIFY TEST SET (GPU) =====
-fprintf('\n[4/9] Classifying test set on GPU...\n');
-augTest = augmentedImageDatastore([224 224 3], dsTest, ...
-    'ColorPreprocessing', 'gray2rgb');
-tic;
-[predLabels, scores] = classify(trainedNet, augTest, ...
-    'MiniBatchSize', 32, 'ExecutionEnvironment', 'gpu');
-t_classify_total = toc;
-accuracy = mean(predLabels == testLabels_true);
-fprintf('  Overall accuracy:  %.2f%%\n', 100*accuracy);
-fprintf('  Total time:        %.1f s for %d images\n', ...
-    t_classify_total, numel(dsTest.Files));
-fprintf('  Avg per image:     %.2f ms\n\n', ...
-    1000*t_classify_total/numel(dsTest.Files));
-
-%% ===== SECTION 5: CONFUSION MATRIX =====
-fprintf('[5/9] Generating confusion matrix...\n');
-fig_cm = figure('Name','Confusion Matrix','Position',[50 50 720 620]);
-cm = confusionchart(testLabels_true, predLabels, ...
-    'Title', sprintf('Mega Model Test Set  (n=%d)   Accuracy: %.2f%%', ...
-                     numel(dsTest.Files), 100*accuracy), ...
-    'RowSummary', 'row-normalized', ...
-    'ColumnSummary', 'column-normalized');
-cm.FontSize = 12;
-cm.DiagonalColor  = [0.18 0.53 0.18];
-cm.OffDiagonalColor = [0.85 0.18 0.18];
-saveas(fig_cm, fullfile(figDir, 'confusion_matrix_test.png'));
-fprintf('  Saved: confusion_matrix_test.png\n');
-
-%% ===== SECTION 6: PER-CLASS METRICS =====
-fprintf('\n[6/9] Per-class precision / recall / F1\n');
-fprintf('%-12s  %9s  %9s  %9s\n', 'Class', 'Precision', 'Recall', 'F1-score');
-fprintf('%s\n', repmat('-',1,46));
-classOrder = {'benign','malignant','normal'};
-metrics = struct();
-for c = 1:numel(classOrder)
-    cl = classOrder{c};
-    if ~any(classNames == cl), continue; end
-    TP = sum(predLabels == cl & testLabels_true == cl);
-    FP = sum(predLabels == cl & testLabels_true ~= cl);
-    FN = sum(predLabels ~= cl & testLabels_true == cl);
-    prec   = TP ./ (TP + FP + eps);
-    recall = TP ./ (TP + FN + eps);
-    f1     = 2 .* prec .* recall ./ (prec + recall + eps);
-    metrics.(cl) = struct('prec',prec,'recall',recall,'f1',f1, ...
-                          'TP',TP,'FP',FP,'FN',FN);
-    fprintf('%-12s  %8.2f%%  %8.2f%%  %9.4f\n', cl, 100*prec, 100*recall, f1);
-end
-
-%% ===== SECTION 7: ROC CURVE -- MALIGNANT VS REST =====
-fprintf('\n[7/9] ROC and Precision-Recall curves...\n');
-malIdx      = find(classNames == 'malignant');
-malScores   = scores(:, malIdx);
-trueIsMal   = (testLabels_true == 'malignant');
-[rocX, rocY, ~, AUC_ROC] = perfcurve(trueIsMal, malScores, true);
-[prX,  prY,  ~, AUC_PR]  = perfcurve(trueIsMal, malScores, true, ...
-    'XCrit', 'reca', 'YCrit', 'prec');
-fprintf('  Malignant detection AUC-ROC: %.4f\n', AUC_ROC);
-fprintf('  Malignant detection AUC-PR:  %.4f\n', AUC_PR);
-
-fig_roc = figure('Name','ROC Curve','Position',[100 100 560 520]);
-plot(rocX, rocY, 'b-', 'LineWidth', 2.5); hold on;
-plot([0 1],[0 1],'k--','LineWidth',1.2);
-xlabel('False Positive Rate','FontSize',13);
-ylabel('True Positive Rate','FontSize',13);
-title(sprintf('ROC Curve -- Malignant Detection  (AUC = %.4f)', AUC_ROC), ...
-    'FontSize',14);
-legend(sprintf('Mega model  AUC=%.3f', AUC_ROC), ...
-    'Random baseline','Location','SouthEast','FontSize',12);
-grid on; set(gca,'FontSize',12);
-saveas(fig_roc, fullfile(figDir, 'roc_malignant.png'));
-fprintf('  Saved: roc_malignant.png\n');
-
-fig_pr = figure('Name','PR Curve','Position',[700 100 560 520]);
-baserate = sum(trueIsMal) / numel(trueIsMal);
-plot(prX, prY, 'r-', 'LineWidth', 2.5); hold on;
-yline(baserate, 'k--', 'LineWidth',1.2);
-xlabel('Recall','FontSize',13);
-ylabel('Precision','FontSize',13);
-title(sprintf('Precision-Recall -- Malignant Detection  (AUC-PR = %.4f)', AUC_PR), ...
-    'FontSize',14);
-legend(sprintf('Mega model  AUC-PR=%.3f', AUC_PR), ...
-    sprintf('Baseline (prevalence=%.2f)', baserate), ...
-    'Location','SouthWest','FontSize',12);
-grid on; set(gca,'FontSize',12);
-saveas(fig_pr, fullfile(figDir, 'pr_malignant.png'));
-fprintf('  Saved: pr_malignant.png\n');
-
-%% ===== SECTION 8: LATENCY MEASUREMENT =====
-fprintf('\n[8/9] Measuring single-image inference latency (GPU)...\n');
-% Read one test image and resize to 224x224 RGB
-img_raw = imread(dsTest.Files{1});
-img_r   = imresize(img_raw, [224 224]);
-if size(img_r,3) == 1
-    img_r = repmat(img_r, [1 1 3]);
-end
-% Warm-up pass (first GPU call has JIT overhead)
-for w = 1:3
-    classify(trainedNet, img_r, 'ExecutionEnvironment', 'gpu');
-end
-% Timed runs
-nRuns   = 50;
-t_runs  = zeros(1, nRuns);
-for r = 1:nRuns
-    t0 = tic;
-    classify(trainedNet, img_r, 'ExecutionEnvironment', 'gpu');
-    t_runs(r) = toc(t0) * 1000;
-end
-fprintf('  Single-image MATLAB GPU inference (n=%d):\n', nRuns);
-fprintf('    Mean: %.2f ms  |  Std: %.2f ms  |  Min: %.2f ms  |  Max: %.2f ms\n', ...
-    mean(t_runs), std(t_runs), min(t_runs), max(t_runs));
-
-fig_lat = figure('Name','Latency Distribution','Position',[100 680 560 380]);
-histogram(t_runs, 20, 'FaceColor',[0.12 0.47 0.71]);
-xlabel('Inference time (ms)','FontSize',12);
-ylabel('Count','FontSize',12);
-title(sprintf('MATLAB GPU Inference Latency  (n=%d runs)\nMean=%.2f ms  Std=%.2f ms', ...
-    nRuns, mean(t_runs), std(t_runs)),'FontSize',13);
-grid on; set(gca,'FontSize',11);
-saveas(fig_lat, fullfile(figDir, 'latency_distribution.png'));
-fprintf('  Saved: latency_distribution.png\n');
-
-%% ===== SECTION 9: OASBUD AUTHENTIC TEST (60 held-out patients) =====
-fprintf('\n[9/9] OASBUD authentic test -- held-out patients...\n');
-data    = load(oasbud_mat);
-nTotal  = numel(data.data);
-fprintf('  Total OASBUD patients: %d\n', nTotal);
-
-% Identify all malignant (label=0) and benign (label=1) patients
-allLabels_oasbud = arrayfun(@(x) x.class, data.data);
-malPat = find(allLabels_oasbud == 0);
-benPat = find(allLabels_oasbud == 1);
-fprintf('  Malignant patients: %d  |  Benign patients: %d\n', ...
-    numel(malPat), numel(benPat));
-
-% Training used first 20 of each -- held-out is the rest
-testMalPat = malPat(21:end);
-testBenPat = benPat(21:end);
-testPatients = [testMalPat(:); testBenPat(:)];
-fprintf('  Held-out: %d malignant + %d benign = %d patients\n', ...
-    numel(testMalPat), numel(testBenPat), numel(testPatients));
-
-predOASBUD = strings(numel(testPatients), 1);
-trueOASBUD = strings(numel(testPatients), 1);
-lat_oasbud = zeros(numel(testPatients), 1);
-
-for i = 1:numel(testPatients)
-    p   = testPatients(i);
-    rf  = double(data.data(p).rf1);   % [depth x 510]
-    lbl = data.data(p).class;         % 0=malignant 1=benign
-    trueOASBUD(i) = ternary(lbl == 0, 'malignant', 'benign');
-    % A-line beamforming: per-column Hilbert envelope detection
-    env   = abs(hilbert(rf));
-    % Power law compression gamma=0.3
-    env   = env ./ max(env(:));
-    bmode = env .^ 0.3;
-    % Resize to 224x224 and convert to uint8 RGB
-    img_bmode = imresize(bmode, [224 224]);
-    img_rgb   = repmat(uint8(img_bmode * 255), [1 1 3]);
-    % Classify
-    t0 = tic;
-    pred = classify(trainedNet, img_rgb, 'ExecutionEnvironment', 'gpu');
-    lat_oasbud(i)  = toc(t0) * 1000;
-    predOASBUD(i)  = string(pred);
-    if mod(i, 10) == 0
-        fprintf('  %d/%d\n', i, numel(testPatients));
+    % --- SECTION 6: per-class metrics ---
+    fprintf('\n[6/9] Per-class precision / recall / F1\n');
+    fprintf('%-12s  %9s  %9s  %9s  %6s\n', 'Class', 'Precision', 'Recall', 'F1-score', 'n');
+    perClass = table('Size', [numel(classNames) 5], ...
+        'VariableTypes', {'string','double','double','double','double'}, ...
+        'VariableNames', {'Class','Precision','Recall','F1','Support'});
+    for c = 1:numel(classNames)
+        TP = confMat(c,c); FP = sum(confMat(:,c)) - TP; FN = sum(confMat(c,:)) - TP;
+        prec = TP / (TP + FP); rec = TP / (TP + FN); f1 = 2*prec*rec / (prec + rec);
+        perClass(c,:) = {classNames(c), prec, rec, f1, TP + FN};
+        fprintf('%-12s  %8.2f%%  %8.2f%%  %9.4f  %6d\n', classNames(c), 100*prec, 100*rec, f1, TP + FN);
     end
+
+    % --- SECTION 7: ROC and PR, malignant vs rest ---
+    fprintf('\n[7/9] ROC and Precision-Recall curves...\n');
+    malScores = scores(:, classNames == "malignant");
+    trueIsMal = (testLabels_true == 'malignant');
+    [rocX, rocY, ~, AUC_ROC] = perfcurve(trueIsMal, malScores, true);
+    [prX,  prY,  ~, AUC_PR]  = perfcurve(trueIsMal, malScores, true, 'XCrit', 'reca', 'YCrit', 'prec');
+    fprintf('  Malignant AUC-ROC: %.4f\n  Malignant AUC-PR:  %.4f\n', AUC_ROC, AUC_PR);
+
+    fig_roc = figure('Name','ROC Curve','Position',[100 100 560 520]);
+    plot(rocX, rocY, 'b-', 'LineWidth', 2.5); hold on; plot([0 1],[0 1],'k--');
+    xlabel('False Positive Rate'); ylabel('True Positive Rate'); grid on;
+    title(sprintf('ROC, Malignant vs Rest (AUC = %.4f)', AUC_ROC));
+    saveas(fig_roc, fullfile(figDir, 'roc_malignant.png'));
+
+    fig_pr = figure('Name','PR Curve','Position',[700 100 560 520]);
+    plot(prX, prY, 'r-', 'LineWidth', 2.5); hold on; yline(mean(trueIsMal), 'k--');
+    xlabel('Recall'); ylabel('Precision'); grid on;
+    title(sprintf('Precision-Recall, Malignant vs Rest (AUC-PR = %.4f)', AUC_PR));
+    saveas(fig_pr, fullfile(figDir, 'pr_malignant.png'));
+
+    % --- SECTION 8: single-image latency ---
+    fprintf('\n[8/9] Single-image inference latency...\n');
+    img_r = imresize(imread(dsTest.Files{1}), [224 224]);
+    if size(img_r,3) == 1, img_r = repmat(img_r, [1 1 3]); end
+    % predict on a GPU dlarray: the per-call overhead of minibatchpredict would dominate
+    X = gpuArray(dlarray(single(img_r), 'SSCB'));
+    gpu = gpuDevice;
+    for w = 1:5, predict(trainedNet, X); end
+    wait(gpu);
+    nRuns = 50; t_runs = zeros(1, nRuns);
+    for r = 1:nRuns
+        t0 = tic; Y = predict(trainedNet, X); wait(gpu); t_runs(r) = toc(t0) * 1000; %#ok<NASGU>
+    end
+    fprintf('  Mean: %.2f ms | Std: %.2f ms (n=%d)\n', mean(t_runs), std(t_runs), nRuns);
+
+    % --- Save ---
+    testFiles = split.testFiles; %#ok<NASGU>
+    save(fullfile(resultsDir, 'cnn_eval.mat'), 'accuracy', 'perClass', 'AUC_ROC', 'AUC_PR', ...
+        'confMat', 'classNames', 'scores', 'predLabels', 'testLabels_true', 'testFiles', 't_runs');
+
+    fid = fopen(fullfile(resultsDir, 'cnn_eval.md'), 'w');
+    fprintf(fid, '# CNN hold-out evaluation\n\nProduced by `MATLAB Codes/Phase6_CNN_Evaluation.m` on the test partition stored in `MATLAB Codes/cnn_split.mat` (seed %d, %d images). The test images were never used for training or validation.\n\n', ...
+        split.seed, numel(testLabels_true));
+    fprintf(fid, '| Class | Precision | Recall | F1 | Support |\n|---|---|---|---|---|\n');
+    for c = 1:height(perClass)
+        fprintf(fid, '| %s | %.2f%% | %.2f%% | %.4f | %d |\n', perClass.Class(c), ...
+            100*perClass.Precision(c), 100*perClass.Recall(c), perClass.F1(c), perClass.Support(c));
+    end
+    fprintf(fid, '\nOverall accuracy: %.2f%% (%d/%d)\n\n', 100*accuracy, sum(predLabels == testLabels_true), numel(testLabels_true));
+    fprintf(fid, 'Malignant vs rest: AUC-ROC %.4f, AUC-PR %.4f\n\n', AUC_ROC, AUC_PR);
+    fprintf(fid, 'Confusion matrix (rows true, columns predicted, order %s):\n\n', strjoin(classNames, ', '));
+    fprintf(fid, '| true \\ pred | %s |\n|---|---|---|---|\n', strjoin(classNames, ' | '));
+    for c = 1:numel(classNames)
+        fprintf(fid, '| %s | %d | %d | %d |\n', classNames(c), confMat(c,:));
+    end
+    fprintf(fid, '\nSingle-image MATLAB inference latency: mean %.2f ms, std %.2f ms (n=%d)\n', mean(t_runs), std(t_runs), nRuns);
+    fclose(fid);
+    fprintf('  Saved cnn_eval.mat and cnn_eval.md to %s\n', resultsDir);
 end
 
-% Convert to categorical for confusionchart
-trueOASBUD_cat = categorical(trueOASBUD);
-predOASBUD_cat = categorical(predOASBUD);
+%% ===== SECTION 9: OASBUD HOLD-OUT PATIENTS =====
+fprintf('\n[9/9] OASBUD hold-out patients...\n');
+data = load(oasbud_mat);
+ids  = arrayfun(@(s) string(s.id), data.data);
+cls  = arrayfun(@(s) double(s.class), data.data);   % 0 = benign, 1 = malignant
+isHeldOut = ~ismember(ids, string(split.oasbudTrainIds));
+testPatients = find(isHeldOut(:));
+fprintf('  Patients in file: %d | used for training: %d | held out: %d (%d benign, %d malignant)\n', ...
+    numel(ids), sum(~isHeldOut), numel(testPatients), sum(cls(testPatients) == 0), sum(cls(testPatients) == 1));
 
-% Metrics
-oasbud_acc  = mean(predOASBUD_cat == trueOASBUD_cat);
-oasbud_mal_tp = sum(predOASBUD == 'malignant' & trueOASBUD == 'malignant');
-oasbud_mal_fn = sum(predOASBUD ~= 'malignant' & trueOASBUD == 'malignant');
-oasbud_mal_recall = oasbud_mal_tp / (oasbud_mal_tp + oasbud_mal_fn + eps);
-fprintf('\n  OASBUD authentic test accuracy:    %.1f%% (%d/%d)\n', ...
-    100*oasbud_acc, sum(predOASBUD_cat==trueOASBUD_cat), numel(testPatients));
-fprintf('  Malignant recall (OASBUD authentic): %.1f%%\n', 100*oasbud_mal_recall);
-fprintf('  Avg latency per patient:              %.2f ms\n', mean(lat_oasbud));
+if numel(testPatients) < 2 || numel(unique(cls(testPatients))) < 2
+    warning('Section 9 skipped: fewer than two held-out patients or only one class in %s.', oasbud_mat);
+else
+    oasbudNames = ["benign" "malignant"];
+    trueOASBUD = categorical(oasbudNames(cls(testPatients) + 1)', oasbudNames);
+    predOASBUD = strings(numel(testPatients), 1);
+    probOASBUD = zeros(numel(testPatients), numel(classNames));
+    for i = 1:numel(testPatients)
+        p = testPatients(i);
+        % Same steps as the Holoscan pipeline: A-line envelope, power law,
+        % uint8, bilateral filter (Phase 3 selection), bilinear resize to 224, gray to RGB.
+        env   = abs(hilbert(double(data.data(p).rf1)));
+        bmode = (env ./ (max(env(:)) + 1e-12)) .^ 0.3;
+        img   = im2uint8(imbilatfilt(im2double(uint8(bmode * 255)), 'DegreeOfSmoothing', 0.1, 'SpatialSigma', 2));
+        img   = repmat(imresize(img, [224 224], 'bilinear'), [1 1 3]);
+        probOASBUD(i,:) = minibatchpredict(trainedNet, img);
+        % Binary decision as in InferenceOp: normal counts as not malignant
+        pMal = probOASBUD(i, classNames == "malignant");
+        predOASBUD(i) = oasbudNames(1 + (pMal > 1 - pMal));
+    end
+    predOASBUD = categorical(predOASBUD, oasbudNames);
+    oasbud_acc = mean(predOASBUD == trueOASBUD);
+    malRecall  = sum(predOASBUD == 'malignant' & trueOASBUD == 'malignant') / sum(trueOASBUD == 'malignant');
+    benRecall  = sum(predOASBUD == 'benign' & trueOASBUD == 'benign') / sum(trueOASBUD == 'benign');
+    fprintf('  OASBUD hold-out accuracy: %.1f%% (%d/%d)\n', 100*oasbud_acc, sum(predOASBUD == trueOASBUD), numel(testPatients));
+    fprintf('  Malignant recall: %.1f%% | Benign recall: %.1f%%\n', 100*malRecall, 100*benRecall);
 
-fig_oasbud = figure('Name','OASBUD Authentic','Position',[50 50 620 540]);
-cm2 = confusionchart(trueOASBUD_cat, predOASBUD_cat, ...
-    'Title', sprintf('OASBUD Authentic Test (n=%d held-out patients)   Acc: %.1f%%', ...
-                      numel(testPatients), 100*oasbud_acc), ...
-    'RowSummary', 'row-normalized');
-cm2.FontSize = 13;
-cm2.DiagonalColor   = [0.18 0.53 0.18];
-cm2.OffDiagonalColor = [0.85 0.18 0.18];
-saveas(fig_oasbud, fullfile(figDir, 'confusion_oasbud_authentic.png'));
-fprintf('  Saved: confusion_oasbud_authentic.png\n');
-
-%% ===== SUMMARY =====
-fprintf('\n=======================================\n');
-fprintf('PHASE 6 MATLAB EVALUATION SUMMARY\n');
-fprintf('=======================================\n');
-fprintf('CNN Test Set (n=%d images)\n', numel(dsTest.Files));
-fprintf('  Overall accuracy:  %.2f%%\n', 100*accuracy);
-fprintf('  Malignant AUC-ROC: %.4f\n', AUC_ROC);
-fprintf('  Malignant AUC-PR:  %.4f\n', AUC_PR);
-fprintf('  MATLAB GPU latency (mean): %.2f ms/image\n', mean(t_runs));
-fprintf('\nOASBUD Authentic Test (n=%d patients)\n', numel(testPatients));
-fprintf('  Accuracy:          %.1f%%\n', 100*oasbud_acc);
-fprintf('  Malignant recall:  %.1f%%\n', 100*oasbud_mal_recall);
-fprintf('\nFigures saved to:\n  %s\n', figDir);
-fprintf('=======================================\n');
-
-%% helper
-function out = ternary(cond, a, b)
-    if cond; out = a; else; out = b; end
+    fig_oasbud = figure('Name','OASBUD hold-out','Position',[50 50 620 540]);
+    confusionchart(trueOASBUD, predOASBUD, 'RowSummary', 'row-normalized', ...
+        'Title', sprintf('OASBUD hold-out (n=%d patients)  Acc: %.1f%%', numel(testPatients), 100*oasbud_acc));
+    saveas(fig_oasbud, fullfile(figDir, 'confusion_oasbud_holdout.png'));
+    heldOutIds = ids(testPatients); %#ok<NASGU>
+    [~, oasbudFile] = fileparts(oasbud_mat); %#ok<ASGLU>
+    save(fullfile(resultsDir, 'oasbud_holdout_eval.mat'), 'oasbud_acc', 'malRecall', 'benRecall', ...
+        'heldOutIds', 'trueOASBUD', 'predOASBUD', 'probOASBUD', 'oasbudFile');
 end
+fprintf('\nFigures saved to %s\n', figDir);

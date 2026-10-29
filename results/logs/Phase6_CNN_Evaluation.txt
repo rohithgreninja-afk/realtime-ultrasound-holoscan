@@ -1,0 +1,43 @@
+[1/9] Loading mega model and split file...
+  Network class:  dlnetwork
+  Output classes: benign, malignant, normal
+  Split seed: 42 | train 3080 | val 721 | test 636 images
+
+[2/9] Building combined datastore and selecting saved test files...
+Combined dataset: 4437 images
+  BUSI          780  (benign=437, malignant=210, normal=133)
+  BUS_UCLM      646  (benign=157, malignant=71, normal=418)
+  BUSBRA       1875  (benign=1268, malignant=607, normal=0)
+  BREAST        256  (benign=154, malignant=98, normal=4)
+  OASBUD_PNG    880  (benign=440, malignant=440, normal=0)
+  Test set: 636 images
+      Value    Count   Percent
+     benign      375     58.96%
+  malignant      212     33.33%
+     normal       49      7.70%
+
+[3-4/9] Classifying test set...
+  Overall accuracy:  81.76%
+  Avg per image:     12.93 ms (batched)
+[5/9] Confusion matrix...
+
+[6/9] Per-class precision / recall / F1
+Class         Precision     Recall   F1-score       n
+benign           84.72%     84.27%     0.8449     375
+malignant        74.65%     75.00%     0.7482     212
+normal           90.00%     91.84%     0.9091      49
+
+[7/9] ROC and Precision-Recall curves...
+  Malignant AUC-ROC: 0.9105
+  Malignant AUC-PR:  0.8154
+
+[8/9] Single-image inference latency...
+  Mean: 17.84 ms | Std: 14.24 ms (n=50)
+  Saved cnn_eval.mat and cnn_eval.md to <repo>\results
+
+[9/9] OASBUD hold-out patients...
+  Patients in file: 100 | used for training: 40 | held out: 60 (28 benign, 32 malignant)
+  OASBUD hold-out accuracy: 56.7% (34/60)
+  Malignant recall: 84.4% | Benign recall: 25.0%
+
+Figures saved to <repo>\results\figures\Phase6
