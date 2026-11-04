@@ -322,7 +322,7 @@ realtime-ultrasound-holoscan/
 ├── results/                        Outputs behind every number in this README (logs/, figures/, *.md)
 ├── Project Figures/                Simulink diagram; superseded/ holds pre-review figures
 ├── Project_Documentation_1.pdf     Project report (pre-review version, see Open items)
-├── Demo Video.mov                  Demo video (see Demo video)
+├── Demo video is hosted on YouTube (see Demo video)
 └── README.md
 ```
 
@@ -407,13 +407,13 @@ The full datasets [1]-[6] are not bundled because of their size; see the referen
 
 ## Demo video
 
-`Demo Video.mov` (48 MB) is committed and was recorded before the review changes, so the numbers on screen are the old ones. A hosted copy: [VIDEO_URL]
+The demo video, recorded after the review changes, is hosted on YouTube (unlisted): https://youtu.be/ucke1-8fchE. It shows the held-out results, the enhancement filter selection, the CUDA check and the Simulink run, and it uses the same figures as this README.
 
 ---
 
 ## Open items
 
-The video link above is a placeholder for the owner to fill in. `Project_Documentation_v2.0.docx` replaces the two earlier documents. The earlier PDF and DOCX draft are pre-review versions kept for reference only, and the README is the current source of truth.
+`Project_Documentation_v2.0.docx` replaces the two earlier documents. The earlier PDF and DOCX draft are pre-review versions kept for reference only, and the README is the current source of truth.
 
 ---
 
