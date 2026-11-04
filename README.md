@@ -7,6 +7,19 @@ An end-to-end pipeline for breast ultrasound: raw OASBUD RF data goes in, a beni
 
 This version answers the MathWorks review. `RESPONSE_TO_REVIEW.md` maps each review item to the commit that addresses it.
 
+> **Hardware requirement: this project does not work as intended on a CPU-only machine.**
+>
+> The reported results need an NVIDIA GPU with CUDA 12. They were produced on an RTX 4070 Laptop GPU under WSL2, following the Setup section.
+>
+> On a CPU-only machine:
+> - The pipelines start and run, but through CPU fallback code paths, which are not the paths that produced the reported figures.
+> - The enhancement stage falls back to numpy when CuPy is missing. Its accuracy on the 60 held-out patients has not been verified, so do not compare CPU output with the 55.0% figure.
+> - `Holoscan/requirements.txt` lists GPU-only packages (`onnxruntime-gpu` and `cupy-cuda12x`). A CPU-only `pip install -r requirements.txt` will fail or install packages that cannot run without a GPU.
+> - In one CPU test run, the 10-frame sample processed only 5 frames. This has not been explained yet.
+> - Timings on CPU are not comparable with the timings in this README.
+>
+> To reproduce the reported numbers, use a machine with an NVIDIA GPU, CUDA 12, and the WSL2 setup described in Setup.
+
 ---
 
 ## Pipeline Architecture
